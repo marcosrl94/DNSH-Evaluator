@@ -16,8 +16,19 @@ interface State {
 
 // Functional component for error UI that can use hooks
 const ErrorFallback: React.FC<{ error: Error | null }> = ({ error }) => {
-  const { theme } = useTheme();
-  const themeClasses = getThemeClasses(theme);
+  // Safely get theme with fallback
+  let theme: 'dark' | 'light' = 'dark';
+  let themeClasses: ReturnType<typeof getThemeClasses>;
+  
+  try {
+    const themeContext = useTheme();
+    theme = themeContext.theme;
+    themeClasses = getThemeClasses(theme);
+  } catch (err) {
+    // If useTheme fails (e.g., outside ThemeProvider), use default dark theme
+    theme = 'dark';
+    themeClasses = getThemeClasses('dark');
+  }
 
   return (
     <div className={`flex items-center justify-center h-full p-8 transition-colors ${themeClasses.bg.primary}`}>

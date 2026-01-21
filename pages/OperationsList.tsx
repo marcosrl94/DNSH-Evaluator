@@ -227,19 +227,19 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
       <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border transition-colors ${themeClasses.bg.secondary} ${themeClasses.border.default}`}>
         <div className="flex items-center space-x-4 flex-1">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#666666]" size={20} />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${themeClasses.text.tertiary}`} size={20} />
             <input 
               type="text" 
               placeholder="BUSCAR_POR_NOMBRE_SECTOR..." 
-              className="w-full pl-10 pr-4 py-2 bg-[#111111] border border-[#1a1a1a] rounded-lg focus:ring-[#00ff88] focus:border-[#00ff88] text-sm text-white placeholder-[#666666] font-mono uppercase tracking-wider"
+              className={`w-full pl-10 pr-4 py-2 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg focus:ring-[#00ff88] focus:border-[#00ff88] text-sm ${themeClasses.input.text} ${themeClasses.input.placeholder} font-mono uppercase tracking-wider`}
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
             />
           </div>
           <div className="flex items-center space-x-2">
-            <Filter size={20} className="text-[#666666]" />
+            <Filter size={20} className={themeClasses.text.tertiary} />
             <select 
-              className="bg-[#111111] border border-[#1a1a1a] rounded-lg py-2 pl-2 pr-8 text-sm text-white focus:ring-[#00ff88] focus:border-[#00ff88] font-mono uppercase tracking-wider"
+              className={`${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg py-2 pl-2 pr-8 text-sm ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono uppercase tracking-wider`}
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -250,46 +250,46 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
             </select>
           </div>
         </div>
-        <button className="flex items-center px-4 py-2 bg-[#00ff88] text-[#0a0a0a] rounded-lg font-medium hover:bg-[#00ff88]/80 transition-colors font-mono uppercase tracking-wider text-xs">
+        <button className={`flex items-center px-4 py-2 bg-[#00ff88] text-[#0a0a0a] rounded-lg font-medium hover:bg-[#00ff88]/80 transition-colors font-mono uppercase tracking-wider text-xs focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}>
           <Plus size={20} className="mr-2" />
           NUEVA_OP
         </button>
       </div>
 
       {/* Table */}
-      <div className="bg-[#0a0a0a] rounded-xl border border-[#1a1a1a] overflow-hidden">
-        <table className="min-w-full divide-y divide-[#1a1a1a]">
-          <thead className="bg-[#111111]">
+      <div className={`${themeClasses.bg.secondary} rounded-xl border ${themeClasses.border.default} overflow-hidden`}>
+        <table className={`min-w-full divide-y ${themeClasses.border.default}`}>
+          <thead className={themeClasses.bg.tertiary}>
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-[#666666] uppercase tracking-wider font-mono">NOMBRE_OP</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-[#666666] uppercase tracking-wider font-mono">ID</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-[#666666] uppercase tracking-wider font-mono">SECTOR_NACE</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-[#666666] uppercase tracking-wider font-mono">PAIS</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-[#666666] uppercase tracking-wider font-mono">CAPEX_TOTAL</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-[#666666] uppercase tracking-wider font-mono">ESTADO_DNSH</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider font-mono`}>NOMBRE_OP</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider font-mono`}>ID</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider font-mono`}>SECTOR_NACE</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider font-mono`}>PAIS</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider font-mono`}>CAPEX_TOTAL</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider font-mono`}>ESTADO_DNSH</th>
               <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody className="bg-[#0a0a0a] divide-y divide-[#1a1a1a]">
+          <tbody className={`${themeClasses.bg.secondary} divide-y ${themeClasses.border.default}`}>
             {filteredOperations.map((op) => {
               const dnshStatus = calculateOperationDnshStatus(op);
               
               return (
-                <tr key={op.id} className="hover:bg-[#111111] transition-colors group">
+                <tr key={op.id} className={`hover:${themeClasses.bg.hover} transition-colors group`}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col">
-                      <span className="text-sm font-bold text-white font-mono uppercase tracking-wider">{op.name.replace(/\s/g, '_')}</span>
-                      <span className="text-xs text-[#666666] font-mono uppercase">{op.assets.length} {op.assets.length === 1 ? 'ASSET' : 'ACTIVOS'}</span>
+                      <span className={`text-sm font-bold ${themeClasses.text.primary} font-mono uppercase tracking-wider`}>{op.name.replace(/\s/g, '_')}</span>
+                      <span className={`text-xs ${themeClasses.text.tertiary} font-mono uppercase`}>{op.assets.length} {op.assets.length === 1 ? 'ASSET' : 'ACTIVOS'}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#666666] font-mono">{op.id}</td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${themeClasses.text.tertiary} font-mono`}>{op.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className="bg-[#1a1a1a] text-[#00a8ff] px-2 py-1 rounded text-xs font-medium border border-[#00a8ff]/30 font-mono uppercase">
+                      <span className={`${themeClasses.bg.tertiary} text-[#00a8ff] px-2 py-1 rounded text-xs font-medium border border-[#00a8ff]/30 font-mono uppercase`}>
                           {op.sectorNACE}
                       </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#a0a0a0] font-mono uppercase">{op.country}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white font-mono">
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${themeClasses.text.secondary} font-mono uppercase`}>{op.country}</td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${themeClasses.text.primary} font-mono`}>
                     €{(op.capex / 1000000).toFixed(1)}M
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -324,28 +324,28 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
                       
                       {/* Asset-level breakdown */}
                       {dnshStatus.totalAssets > 0 && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-[#666666] font-mono uppercase">
-                          <span className="font-semibold text-white">{dnshStatus.compliantAssets}/{dnshStatus.totalAssets}</span>
-                          <span className="text-[#666666]">COMPLIANT</span>
+                        <div className={`flex items-center gap-1.5 text-[10px] ${themeClasses.text.tertiary} font-mono uppercase`}>
+                          <span className={`font-semibold ${themeClasses.text.primary}`}>{dnshStatus.compliantAssets}/{dnshStatus.totalAssets}</span>
+                          <span className={themeClasses.text.tertiary}>COMPLIANT</span>
                           {dnshStatus.breakdown.nonCompliant > 0 && (
                             <>
-                              <span className="text-[#666666]">•</span>
+                              <span className={themeClasses.text.tertiary}>•</span>
                               <span className="text-red-400 font-semibold">{dnshStatus.breakdown.nonCompliant}</span>
                               <span className="text-red-400">NON_COMPLIANT</span>
                             </>
                           )}
                           {dnshStatus.breakdown.conditional > 0 && (
                             <>
-                              <span className="text-[#666666]">•</span>
+                              <span className={themeClasses.text.tertiary}>•</span>
                               <span className="text-[#ffb800] font-semibold">{dnshStatus.breakdown.conditional}</span>
                               <span className="text-[#ffb800]">CONDITIONAL</span>
                             </>
                           )}
                           {dnshStatus.breakdown.notAssessed > 0 && (
                             <>
-                              <span className="text-[#666666]">•</span>
-                              <span className="text-[#666666] font-semibold">{dnshStatus.breakdown.notAssessed}</span>
-                              <span className="text-[#666666]">NOT_ASSESSED</span>
+                              <span className={themeClasses.text.tertiary}>•</span>
+                              <span className={`${themeClasses.text.tertiary} font-semibold`}>{dnshStatus.breakdown.notAssessed}</span>
+                              <span className={themeClasses.text.tertiary}>NOT_ASSESSED</span>
                             </>
                           )}
                         </div>
@@ -363,7 +363,14 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button 
                       onClick={() => onNavigateToOperation(op.id)}
-                      className="text-[#00ff88] hover:text-white bg-[#00ff88]/10 hover:bg-[#00ff88]/20 px-3 py-1.5 rounded transition-colors flex items-center ml-auto border border-[#00ff88]/30 font-mono uppercase tracking-wider text-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onNavigateToOperation(op.id);
+                        }
+                      }}
+                      className="text-[#00ff88] hover:text-white bg-[#00ff88]/10 hover:bg-[#00ff88]/20 px-3 py-1.5 rounded transition-colors flex items-center ml-auto border border-[#00ff88]/30 font-mono uppercase tracking-wider text-xs focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50"
+                      aria-label={`View details for operation ${op.name}`}
                     >
                       DETALLES <ArrowRight size={16} className="ml-1" />
                     </button>
@@ -374,7 +381,7 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
           </tbody>
         </table>
         {filteredOperations.length === 0 && (
-            <div className="p-8 text-center text-[#666666] font-mono uppercase text-xs">
+            <div className={`p-8 text-center ${themeClasses.text.tertiary} font-mono uppercase text-xs`}>
                 NO_SE_ENCONTRARON_OPERACIONES
             </div>
         )}

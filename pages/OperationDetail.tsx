@@ -6,6 +6,8 @@ import MapViewer from '../components/MapViewer';
 import EvidenceRegistry from '../components/EvidenceRegistry';
 import AssetDetailPanel from '../components/AssetDetailPanel';
 import { calculateObjectiveStats } from '../utils/dnshCalculations';
+import { useTheme } from '../context/ThemeContext';
+import { getThemeClasses } from '../utils/themeUtils';
 
 interface Props {
   operation: Operation;
@@ -219,32 +221,32 @@ const OperationDetailPage: React.FC<Props> = ({
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Operation Info & Assets */}
-        <div className="w-80 bg-[#0a0a0a] border-r border-[#1a1a1a] flex flex-col overflow-hidden">
+        <div className={`w-80 ${themeClasses.bg.secondary} ${themeClasses.border.default} border-r flex flex-col overflow-hidden`}>
           {/* Operation Info Card */}
-          <div className="p-6 border-b border-[#1a1a1a] bg-gradient-to-br from-[#111111] to-[#0a0a0a]">
+          <div className={`p-6 border-b ${themeClasses.border.default} ${themeClasses.bg.tertiary}`}>
             <div className="space-y-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-lg font-bold text-white mb-1 font-mono uppercase tracking-wider">{operation.name.toUpperCase().replace(/\s/g, '_')}</h2>
-                  <p className="text-xs text-[#666666] font-mono uppercase">{operation.id}</p>
+                  <h2 className={`text-lg font-bold ${themeClasses.text.primary} mb-1 font-mono uppercase tracking-wider`}>{operation.name.toUpperCase().replace(/\s/g, '_')}</h2>
+                  <p className={`text-xs ${themeClasses.text.tertiary} font-mono uppercase`}>{operation.id}</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <span className="text-[#666666] text-xs block mb-1 font-mono uppercase tracking-wider">NACE_SECTOR</span>
-                  <span className="font-semibold text-white font-mono">{operation.sectorNACE}</span>
+                  <span className={`${themeClasses.text.tertiary} text-xs block mb-1 font-mono uppercase tracking-wider`}>NACE_SECTOR</span>
+                  <span className={`font-semibold ${themeClasses.text.primary} font-mono`}>{operation.sectorNACE}</span>
                 </div>
                 <div>
-                  <span className="text-[#666666] text-xs block mb-1 font-mono uppercase tracking-wider">LOCATION</span>
-                  <span className="font-semibold text-white font-mono uppercase">{operation.country}</span>
+                  <span className={`${themeClasses.text.tertiary} text-xs block mb-1 font-mono uppercase tracking-wider`}>LOCATION</span>
+                  <span className={`font-semibold ${themeClasses.text.primary} font-mono uppercase`}>{operation.country}</span>
                 </div>
                 <div>
-                  <span className="text-[#666666] text-xs block mb-1 font-mono uppercase tracking-wider">TOTAL_CAPEX</span>
-                  <span className="font-semibold text-white font-mono">€{(operation.capex / 1000000).toFixed(1)}M</span>
+                  <span className={`${themeClasses.text.tertiary} text-xs block mb-1 font-mono uppercase tracking-wider`}>TOTAL_CAPEX</span>
+                  <span className={`font-semibold ${themeClasses.text.primary} font-mono`}>€{(operation.capex / 1000000).toFixed(1)}M</span>
                 </div>
                 <div>
-                  <span className="text-[#666666] text-xs block mb-1 font-mono uppercase tracking-wider">STATUS</span>
+                  <span className={`${themeClasses.text.tertiary} text-xs block mb-1 font-mono uppercase tracking-wider`}>STATUS</span>
                   <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono uppercase tracking-wider ${
                     operation.status === 'Compliant' ? 'bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/30' :
                     operation.status === 'Non-Compliant' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
@@ -256,43 +258,43 @@ const OperationDetailPage: React.FC<Props> = ({
               </div>
 
               {/* DNSH Summary */}
-              <div className="bg-[#111111] rounded-lg p-3 border border-[#1a1a1a]">
+              <div className={`${themeClasses.bg.tertiary} rounded-lg p-3 border ${themeClasses.border.default}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-white font-mono uppercase tracking-wider">DNSH_STATUS</span>
+                  <span className={`text-xs font-semibold ${themeClasses.text.primary} font-mono uppercase tracking-wider`}>DNSH_STATUS</span>
                   {dnshSummary.totalAssets > 0 ? (
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase tracking-wider ${
                       dnshSummary.compliant === dnshSummary.totalAssets ? 'bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30' :
                       dnshSummary.nonCompliant > 0 ? 'bg-red-500/10 text-red-500 border border-red-500/30' :
-                      dnshSummary.notAssessed === dnshSummary.totalAssets ? 'bg-[#111111] text-[#666666] border border-[#1a1a1a]' :
+                      dnshSummary.notAssessed === dnshSummary.totalAssets ? `${themeClasses.bg.tertiary} ${themeClasses.text.tertiary} border ${themeClasses.border.default}` :
                       'bg-[#ffb800]/10 text-[#ffb800] border border-[#ffb800]/30'
                     }`}>
                       {dnshSummary.compliant}/{dnshSummary.totalAssets} COMPLIANT
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-[#111111] text-[#666666] border border-[#1a1a1a]">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${themeClasses.bg.tertiary} ${themeClasses.text.tertiary} border ${themeClasses.border.default}`}>
                       NO_ASSETS_EVAL
                     </span>
                   )}
                 </div>
                 {dnshSummary.totalAssets > 0 ? (
-                  <div className="flex items-center space-x-2 text-xs text-[#666666] font-mono">
+                  <div className={`flex items-center space-x-2 text-xs ${themeClasses.text.tertiary} font-mono`}>
                     {dnshSummary.compliant > 0 && <span className="text-[#00ff88]">{dnshSummary.compliant} ✓</span>}
                     {dnshSummary.nonCompliant > 0 && <span className="text-red-500">{dnshSummary.nonCompliant} ✗</span>}
                     {dnshSummary.conditional > 0 && <span className="text-[#ffb800]">{dnshSummary.conditional} ⚠</span>}
                     {dnshSummary.notAssessed > 0 && (
-                      <span className="text-[#666666] italic" title="Assets without DNSH evaluation">
+                      <span className={`${themeClasses.text.tertiary} italic`} title="Assets without DNSH evaluation">
                         {dnshSummary.notAssessed} ○ NOT_ASSESSED
                       </span>
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs text-[#666666] italic font-mono">NO_ASSETS_EVALUATED_FOR_DNSH_COMPLIANCE_YET</p>
+                  <p className={`text-xs ${themeClasses.text.tertiary} italic font-mono`}>NO_ASSETS_EVALUATED_FOR_DNSH_COMPLIANCE_YET</p>
                 )}
               </div>
 
               {/* DNSH Objectives Quick Access */}
-              <div className="bg-[#111111] rounded-lg p-3 border border-[#1a1a1a]">
-                <h4 className="text-xs font-semibold text-white mb-2 flex items-center font-mono uppercase tracking-wider">
+              <div className={`${themeClasses.bg.tertiary} rounded-lg p-3 border ${themeClasses.border.default}`}>
+                <h4 className={`text-xs font-semibold ${themeClasses.text.primary} mb-2 flex items-center font-mono uppercase tracking-wider`}>
                   <Target size={12} className="mr-1" />
                   OBJETIVOS_DNSH
                 </h4>
@@ -316,7 +318,7 @@ const OperationDetailPage: React.FC<Props> = ({
                               onNavigateToDnshEvaluation();
                             }
                           }}
-                          className={`w-full text-left p-2 rounded border transition-all cursor-pointer active:scale-[0.98] ${
+                          className={`w-full text-left p-2 rounded border transition-all cursor-pointer active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50 ${
                             isSubstantial 
                               ? (color === 'emerald' ? 'bg-[#00ff88]/10 border-[#00ff88]/30 hover:bg-[#00ff88]/15 hover:shadow-lg hover:shadow-[#00ff88]/10' :
                                  color === 'amber' ? 'bg-[#ffb800]/10 border-[#ffb800]/30 hover:bg-[#ffb800]/15 hover:shadow-lg hover:shadow-[#ffb800]/10' :
@@ -324,8 +326,8 @@ const OperationDetailPage: React.FC<Props> = ({
                                  color === 'purple' ? 'bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/15 hover:shadow-lg hover:shadow-purple-500/10' :
                                  color === 'red' ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/15 hover:shadow-lg hover:shadow-red-500/10' :
                                  color === 'green' ? 'bg-[#00ff88]/10 border-[#00ff88]/30 hover:bg-[#00ff88]/15 hover:shadow-lg hover:shadow-[#00ff88]/10' :
-                                 'bg-[#0a0a0a] border-[#1a1a1a] hover:bg-[#111111]')
-                              : 'bg-[#0a0a0a] border-[#1a1a1a] hover:border-[#00ff88]/20 hover:bg-[#111111] active:bg-[#0a0a0a]'
+                                 `${themeClasses.bg.secondary} ${themeClasses.border.default} hover:${themeClasses.bg.hover}`)
+                              : `${themeClasses.bg.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/20 hover:${themeClasses.bg.hover} active:${themeClasses.bg.secondary}`
                           }`}
                         >
                         <div className="flex items-center justify-between">
@@ -348,7 +350,7 @@ const OperationDetailPage: React.FC<Props> = ({
                                 )}
                               </div>
                               <div className="flex items-center space-x-1 mt-0.5">
-                                <div className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
+                                <div className={`flex-1 h-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} rounded-full overflow-hidden`}>
                                   <div 
                                     className={`h-1 rounded-full ${
                                       color === 'emerald' ? 'bg-emerald-500' :
@@ -357,12 +359,12 @@ const OperationDetailPage: React.FC<Props> = ({
                                       color === 'purple' ? 'bg-purple-500' :
                                       color === 'red' ? 'bg-red-500' :
                                       color === 'green' ? 'bg-green-500' :
-                                      'bg-slate-500'
+                                      theme === 'dark' ? 'bg-slate-500' : 'bg-slate-400'
                                     }`}
                                     style={{ width: `${status.progress}%` }}
                                   />
                                 </div>
-                                <span className="text-[10px] text-slate-500 whitespace-nowrap ml-1">
+                                <span className={`text-[10px] ${themeClasses.text.tertiary} whitespace-nowrap ml-1`}>
                                   {status.compliant}/{status.total}
                                 </span>
                               </div>
@@ -390,10 +392,10 @@ const OperationDetailPage: React.FC<Props> = ({
           </div>
 
           {/* Assets List */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold text-white text-sm font-mono uppercase tracking-wider">ASSETS ({operation.assets.length})</h3>
-              <span className="text-xs text-[#666666] font-mono uppercase tracking-wider">CLICK_PARA_VER_EN_MAPA</span>
+              <h3 className={`font-semibold ${themeClasses.text.primary} text-sm font-mono uppercase tracking-wider`}>ASSETS ({operation.assets.length})</h3>
+              <span className={`text-xs ${themeClasses.text.tertiary} font-mono uppercase tracking-wider`}>CLICK_PARA_VER_EN_MAPA</span>
             </div>
             <div className="space-y-2">
               {operation.assets.map(asset => {
@@ -404,10 +406,20 @@ const OperationDetailPage: React.FC<Props> = ({
                   <div
                     key={asset.id}
                     onClick={() => handleAssetClick(asset.id)}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all active:scale-[0.98] ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleAssetClick(asset.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Select asset ${asset.name}`}
+                    aria-current={isSelected ? 'true' : 'false'}
+                    className={`p-3 rounded-lg border cursor-pointer transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50 ${
                       isSelected
                         ? 'bg-[#00ff88]/10 border-[#00ff88]/30 shadow-lg shadow-[#00ff88]/10'
-                        : 'bg-[#0a0a0a] border-[#1a1a1a] hover:border-[#00ff88]/30 hover:bg-[#111111] hover:shadow-md hover:shadow-[#00ff88]/5 active:bg-[#0a0a0a]'
+                        : `${themeClasses.bg.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30 hover:${themeClasses.bg.hover} hover:shadow-md hover:shadow-[#00ff88]/5 active:${themeClasses.bg.secondary}`
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2">
@@ -425,11 +437,11 @@ const OperationDetailPage: React.FC<Props> = ({
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-semibold truncate font-mono uppercase tracking-wider ${
-                            isSelected ? 'text-[#00ff88]' : 'text-white'
+                            isSelected ? 'text-[#00ff88]' : themeClasses.text.primary
                           }`}>
                             {asset.name.replace(/\s/g, '_')}
                           </p>
-                          <p className="text-xs text-[#666666] truncate font-mono uppercase">
+                          <p className={`text-xs ${themeClasses.text.tertiary} truncate font-mono uppercase`}>
                             {asset.assetType.replace(/\s/g, '_')}
                             {asset.attributes.yearBuilt && ` • ${asset.attributes.yearBuilt}`}
                             {asset.attributes.siteType && ` • ${asset.attributes.siteType.replace(/\s/g, '_')}`}
@@ -438,17 +450,17 @@ const OperationDetailPage: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-xs mt-2">
-                      <div className="flex items-center space-x-2 text-[#666666]">
+                      <div className={`flex items-center space-x-2 ${themeClasses.text.tertiary}`}>
                         <MapPin size={12} />
                         <span className="font-mono">{asset.lat.toFixed(2)}, {asset.lng.toFixed(2)}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-white font-mono">€{(asset.exposedValue / 1000000).toFixed(1)}M</span>
+                        <span className={`font-semibold ${themeClasses.text.primary} font-mono`}>€{(asset.exposedValue / 1000000).toFixed(1)}M</span>
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
                           status === 'Compliant' ? 'bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/30' :
                           status === 'Non-Compliant' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
                           status === 'Conditional' ? 'bg-[#ffb800]/20 text-[#ffb800] border border-[#ffb800]/30' :
-                          'bg-[#1a1a1a] text-[#666666] border border-[#1a1a1a]'
+                          `${themeClasses.bg.tertiary} ${themeClasses.text.tertiary} border ${themeClasses.border.default}`
                         }`}>
                           {status.charAt(0)}
                         </span>
@@ -462,7 +474,7 @@ const OperationDetailPage: React.FC<Props> = ({
         </div>
 
         {/* Right Main Content - Integrated Map View */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-black relative">
+        <div className={`flex-1 flex flex-col overflow-hidden ${themeClasses.bg.primary} relative`}>
           {/* Floating Action Bar */}
           <div className="absolute top-4 right-4 z-20 flex items-center space-x-2">
             <button

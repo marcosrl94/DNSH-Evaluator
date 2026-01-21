@@ -8,6 +8,7 @@
 import { Measure, HazardType } from '../types';
 import { ExtendedMeasure, KnowledgeBaseEntry, CaseStudy, CatalogOperation } from '../types/catalog';
 import { EPAdaptationMeasureCategory, EPAdaptationPathwayType } from '../constants/equatorPrinciples';
+import { EXTENDED_MEASURES } from '../constants/extendedMeasures';
 
 /**
  * In-memory storage (in production, this would be a database)
@@ -252,8 +253,7 @@ export const initializeCatalog = (defaultMeasures: Measure[]): void => {
     catalogStorage.deleteMeasure(m.id);
   });
   
-  // Import and add extended measures directly
-  const { EXTENDED_MEASURES } = require('../constants/extendedMeasures');
+  // Add extended measures directly (already imported at top of file)
   EXTENDED_MEASURES.forEach((measure: ExtendedMeasure) => {
     catalogStorage.addMeasure(measure);
   });

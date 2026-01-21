@@ -4,6 +4,8 @@ import { DEMO_OPERATIONS, DEMO_CLIENTS } from '../constants';
 import { Operation, DnshObjective, Client, RiskBand } from '../types';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
 import { canDisplayDnshStatus, getSafeDnshStatus } from '../services/dnshValidation';
+import { useTheme } from '../context/ThemeContext';
+import { getThemeClasses } from '../utils/themeUtils';
 
 interface DashboardProps {
   onNavigateToOperation: (id: string) => void;
@@ -19,6 +21,9 @@ const DashboardPage: React.FC<DashboardProps> = ({
   onNavigateToMapViewer,
   onNavigateToReports
 }) => {
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
+  
   // Calculate real metrics from operations
   const metrics = useMemo(() => {
     const totalOperations = DEMO_OPERATIONS.length;
@@ -204,28 +209,28 @@ const DashboardPage: React.FC<DashboardProps> = ({
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiCard 
+        <KpiCard themeClasses={themeClasses}
           title="TOTAL_OPERACIONES" 
           value={metrics.totalOperations} 
           subtext={`${metrics.totalAssets} ACTIVOS_EN_CARTERA`}
           icon={<Briefcase className="text-[#00ff88]" size={24} />} 
           iconBg="bg-[#00ff88]/10"
         />
-        <KpiCard 
+        <KpiCard themeClasses={themeClasses}
           title="TASA_CUMPLIMIENTO" 
           value={`${metrics.overallComplianceRate}%`} 
           subtext={`${metrics.compliantAssets}/${metrics.compliantAssets + metrics.nonCompliantAssets + metrics.conditionalAssets} ASSETS_COMPLIANT`}
           icon={<TrendingUp className="text-[#00ff88]" size={24} />} 
           iconBg="bg-[#00ff88]/10"
         />
-        <KpiCard 
+        <KpiCard themeClasses={themeClasses}
           title="AAL_TOTAL" 
           value={`${metrics.totalAAL.toFixed(2)} M€`} 
           subtext="PERDIDA_ANUAL_ESPERADA"
           icon={<AlertTriangle className="text-[#ffb800]" size={24} />} 
           iconBg="bg-[#ffb800]/10"
         />
-        <KpiCard 
+        <KpiCard themeClasses={themeClasses}
           title="REVISIONES_PENDIENTES" 
           value={metrics.operationsWithPendingReviews} 
           subtext={`${metrics.conditionalAssets + metrics.nonCompliantAssets} ASSETS_REQUIEREN_ATENCION`}
@@ -305,9 +310,9 @@ const DashboardPage: React.FC<DashboardProps> = ({
       </div>
 
       {/* Operations Table (Preserved as requested) */}
-      <div className="bg-[#0a0a0a] rounded-xl shadow-sm border border-[#1a1a1a] overflow-hidden">
-        <div className="px-6 py-5 border-b border-[#1a1a1a] flex justify-between items-center bg-[#111111]">
-          <h3 className="text-lg font-bold text-white font-mono uppercase tracking-wider">OPERACIONES_RECIENTES</h3>
+      <div className={`${themeClasses.bg.secondary} rounded-xl shadow-sm border ${themeClasses.border.default} overflow-hidden`}>
+        <div className={`px-6 py-5 border-b ${themeClasses.border.default} flex justify-between items-center ${themeClasses.bg.tertiary}`}>
+          <h3 className={`text-lg font-bold ${themeClasses.text.primary} font-mono uppercase tracking-wider`}>OPERACIONES_RECIENTES</h3>
           {onNavigateToOperationsList ? (
             <button 
               type="button"
@@ -316,7 +321,8 @@ const DashboardPage: React.FC<DashboardProps> = ({
                 e.stopPropagation();
                 onNavigateToOperationsList();
               }}
-              className="text-[#00ff88] text-xs font-semibold hover:text-[#00ff88]/80 flex items-center transition-all group font-mono uppercase tracking-wider cursor-pointer active:scale-[0.95]"
+              className="text-[#00ff88] text-xs font-semibold hover:text-[#00ff88]/80 flex items-center transition-all group font-mono uppercase tracking-wider cursor-pointer active:scale-[0.95] focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50"
+              aria-label="View all operations"
             >
               VER_TODAS_LAS_OPERACIONES <ArrowRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
             </button>
@@ -328,26 +334,27 @@ const DashboardPage: React.FC<DashboardProps> = ({
                 e.stopPropagation();
                 onNavigateToOperation(DEMO_OPERATIONS[0]?.id || '');
               }}
-              className="text-[#00ff88] text-xs font-semibold hover:text-[#00ff88]/80 flex items-center transition-all group font-mono uppercase tracking-wider cursor-pointer active:scale-[0.95]"
+              className="text-[#00ff88] text-xs font-semibold hover:text-[#00ff88]/80 flex items-center transition-all group font-mono uppercase tracking-wider cursor-pointer active:scale-[0.95] focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50"
+              aria-label="View all operations"
             >
               VER_TODAS_LAS_OPERACIONES <ArrowRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
           </button>
           )}
         </div>
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-[#111111]">
+        <table className={`min-w-full divide-y ${theme === 'dark' ? 'divide-slate-700' : 'divide-slate-200'}`}>
+          <thead className={themeClasses.bg.tertiary}>
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Cliente</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Operación</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Sector</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">País</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Inversión</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Assets</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado DNSH</th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Acción</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider`}>Cliente</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider`}>Operación</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider`}>Sector</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider`}>País</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider`}>Inversión</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider`}>Assets</th>
+              <th className={`px-6 py-4 text-left text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider`}>Estado DNSH</th>
+              <th className={`px-6 py-4 text-right text-xs font-semibold ${themeClasses.text.tertiary} uppercase tracking-wider`}>Acción</th>
             </tr>
           </thead>
-          <tbody className="bg-[#0a0a0a] divide-y divide-[#1a1a1a]">
+          <tbody className={`${themeClasses.bg.secondary} divide-y ${themeClasses.border.default}`}>
             {DEMO_OPERATIONS.map((op) => {
               const client = DEMO_CLIENTS.find(c => c.id === op.clientId);
               // Calculate operation DNSH status using safe status (validates assessment)
@@ -380,35 +387,44 @@ const DashboardPage: React.FC<DashboardProps> = ({
               return (
               <tr 
                 key={op.id} 
-                className="hover:bg-[#111111] transition-all cursor-pointer group active:scale-[0.99]"
+                className={`hover:${themeClasses.bg.hover} transition-all cursor-pointer group active:scale-[0.99]`}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   onNavigateToOperation(op.id);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onNavigateToOperation(op.id);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`View operation ${op.name}`}
               >
                 <td className="px-6 py-4 whitespace-nowrap">
                   {client && (
                     <div className="flex items-center space-x-2">
                       <Building2 size={16} className="text-blue-500" />
-                      <span className="text-sm font-medium text-slate-700">{client.name}</span>
+                      <span className={`text-sm font-medium ${themeClasses.text.secondary}`}>{client.name}</span>
                     </div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-bold text-white group-hover:text-[#00ff88] font-mono uppercase tracking-wider">{op.name.replace(/\s/g, '_')}</div>
-                  <div className="text-xs text-[#666666] mt-0.5 font-mono uppercase">{op.assets.length}_ACTIVOS_ASOCIADOS</div>
+                  <div className={`text-sm font-bold ${themeClasses.text.primary} group-hover:text-[#00ff88] font-mono uppercase tracking-wider`}>{op.name.replace(/\s/g, '_')}</div>
+                  <div className={`text-xs ${themeClasses.text.tertiary} mt-0.5 font-mono uppercase`}>{op.assets.length}_ACTIVOS_ASOCIADOS</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-[#a0a0a0] font-mono">{op.sectorNACE}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-[#a0a0a0] font-mono">{op.country}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-medium font-mono">€{(op.capex / 1000000).toFixed(1)}M</td>
+                <td className={`px-6 py-4 whitespace-nowrap text-sm ${themeClasses.text.secondary} font-mono`}>{op.sectorNACE}</td>
+                <td className={`px-6 py-4 whitespace-nowrap text-sm ${themeClasses.text.secondary} font-mono`}>{op.country}</td>
+                <td className={`px-6 py-4 whitespace-nowrap text-sm ${themeClasses.text.primary} font-medium font-mono`}>€{(op.capex / 1000000).toFixed(1)}M</td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-white font-medium font-mono">{op.assets.length}</div>
-                    <div className="text-xs text-[#666666]">
+                    <div className={`text-sm ${themeClasses.text.primary} font-medium font-mono`}>{op.assets.length}</div>
+                    <div className={`text-xs ${themeClasses.text.tertiary}`}>
                       {compliantCount > 0 && <span className="text-[#00ff88]">{compliantCount}✓</span>}
                       {conditionalCount > 0 && <span className="text-[#ffb800] ml-1">{conditionalCount}⚠</span>}
                       {nonCompliantCount > 0 && <span className="text-red-500 ml-1">{nonCompliantCount}✗</span>}
-                      {notAssessedCount > 0 && <span className="text-[#666666] ml-1">{notAssessedCount}○</span>}
+                      {notAssessedCount > 0 && <span className={themeClasses.text.tertiary + ' ml-1'}>{notAssessedCount}○</span>}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -417,7 +433,7 @@ const DashboardPage: React.FC<DashboardProps> = ({
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <span className="text-[#666666] group-hover:text-[#00ff88] transition-colors font-mono uppercase tracking-wider">EVALUAR →</span>
+                  <span className={`${themeClasses.text.tertiary} group-hover:text-[#00ff88] transition-colors font-mono uppercase tracking-wider`}>EVALUAR →</span>
                 </td>
               </tr>
               );
@@ -430,19 +446,19 @@ const DashboardPage: React.FC<DashboardProps> = ({
 };
 
 // Helper Components
-const KpiCard = ({ title, value, subtext, icon, iconBg }: any) => (
-  <div className="bg-[#0a0a0a] p-6 rounded-xl shadow-sm border border-[#1a1a1a] flex flex-col justify-between h-40 relative overflow-hidden group hover:border-[#00ff88]/30 hover:scale-[1.02] transition-all cursor-pointer">
+const KpiCard = ({ title, value, subtext, icon, iconBg, themeClasses }: any) => (
+  <div className={`${themeClasses.bg.secondary} p-6 rounded-xl shadow-sm border ${themeClasses.border.default} flex flex-col justify-between h-40 relative overflow-hidden group hover:border-[#00ff88]/30 hover:scale-[1.02] transition-all cursor-pointer`}>
      <div className="flex justify-between items-start z-10">
         <div>
-           <p className="text-[10px] font-semibold text-[#666666] uppercase tracking-widest font-mono">{title}</p>
-           <h3 className="text-4xl font-bold text-white mt-2 font-mono tracking-tight">{value}</h3>
+           <p className={`text-[10px] font-semibold ${themeClasses.text.tertiary} uppercase tracking-widest font-mono`}>{title}</p>
+           <h3 className={`text-4xl font-bold ${themeClasses.text.primary} mt-2 font-mono tracking-tight`}>{value}</h3>
         </div>
         <div className={`p-3 rounded-xl ${iconBg} transition-transform group-hover:scale-110`}>
            {icon}
         </div>
      </div>
      <div className="mt-auto z-10">
-      <p className="text-[10px] text-[#666666] font-mono uppercase tracking-wider">{subtext}</p>
+      <p className={`text-[10px] ${themeClasses.text.tertiary} font-mono uppercase tracking-wider`}>{subtext}</p>
      </div>
   </div>
 );

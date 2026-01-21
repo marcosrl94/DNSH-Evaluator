@@ -7,7 +7,7 @@ import { Asset, AssetDnshEvaluation, DnshObjective, Operation } from '../types';
 
 /**
  * Get the status for a specific objective from an asset evaluation
- * Handles special case for Adaptation (uses adaptationStatus if available, falls back to adaptationStatusPreMeasures)
+ * PRIMARY SOURCE OF TRUTH: Checklist answers. Only returns status if checklist is completed.
  */
 export const getObjectiveStatusFromAsset = (
   evaluation: AssetDnshEvaluation | undefined,
@@ -15,19 +15,31 @@ export const getObjectiveStatusFromAsset = (
 ): 'Compliant' | 'Non-Compliant' | 'Conditional' | 'Not Assessed' => {
   if (!evaluation) return 'Not Assessed';
 
+  // Check if checklist has been completed for this objective
+  const checklistAnswers = evaluation.checklistAnswers?.[objective];
+  const hasChecklist = checklistAnswers && Object.keys(checklistAnswers).length > 0;
+
   switch (objective) {
     case DnshObjective.MITIGATION:
+      // Only return status if checklist is completed
+      if (!hasChecklist) return 'Not Assessed';
       return evaluation.mitigationStatus;
     case DnshObjective.ADAPTATION:
-      // For Adaptation, prefer adaptationStatus (post-measures) if available, otherwise use pre-measures
-      return evaluation.adaptationStatus || evaluation.adaptationStatusPreMeasures;
+      // Only return status if checklist is completed
+      if (!hasChecklist) return 'Not Assessed';
+      // Use adaptationStatus (which comes from checklist)
+      return evaluation.adaptationStatus || 'Not Assessed';
     case DnshObjective.WATER:
+      if (!hasChecklist) return 'Not Assessed';
       return evaluation.waterStatus;
     case DnshObjective.CIRCULAR:
+      if (!hasChecklist) return 'Not Assessed';
       return evaluation.circularStatus;
     case DnshObjective.POLLUTION:
+      if (!hasChecklist) return 'Not Assessed';
       return evaluation.pollutionStatus;
     case DnshObjective.BIODIVERSITY:
+      if (!hasChecklist) return 'Not Assessed';
       return evaluation.biodiversityStatus;
     default:
       return 'Not Assessed';

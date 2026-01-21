@@ -23,7 +23,7 @@ const CatalogsPage = lazy(() => import('./pages/Catalogs'));
 const ReportsPage = lazy(() => import('./pages/Reports'));
 const LoginPage = lazy(() => import('./pages/Login'));
 const ClientDetailPage = lazy(() => import('./pages/ClientDetail'));
-const ClientDnshEvaluationPage = lazy(() => import('./pages/ClientDnshEvaluation'));
+// ClientDnshEvaluationPage removed - unified in DnshEvaluationEnhancedPage
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
 
 // Loading fallback component
@@ -36,7 +36,7 @@ const LoadingFallback: React.FC = () => (
   </div>
 );
 
-type View = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail' | 'client-dnsh-evaluation' | 'dnsh-evaluation' | 'map-viewer' | 'catalogs' | 'reports';
+type View = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail' | 'dnsh-evaluation' | 'map-viewer' | 'catalogs' | 'reports';
 
 // Separate component for the authenticated layout to use the hook
 const AuthenticatedApp: React.FC = () => {
@@ -195,9 +195,20 @@ const AuthenticatedApp: React.FC = () => {
   }, []);
 
   const handleNavigateToClientDnshEvaluation = useCallback((clientId: string) => {
-    setSelectedClientId(clientId);
-    setCurrentView('client-dnsh-evaluation');
-  }, []);
+    // Unificar: navegar a la evaluación detallada de la primera operación del cliente
+    const clientOps = operations.filter(op => op.clientId === clientId);
+    if (clientOps.length > 0) {
+      // Navegar a la primera operación del cliente y luego a la evaluación detallada
+      setSelectedClientId(clientId);
+      setSelectedOperationId(clientOps[0].id);
+      setSelectedAssetId(null); // Empezar en vista Portfolio
+      setCurrentView('dnsh-evaluation');
+    } else {
+      // Si no hay operaciones, mantener en client-detail
+      setSelectedClientId(clientId);
+      setCurrentView('client-detail');
+    }
+  }, [operations]);
 
   const handleNavigateToDnshObjective = useCallback((objective: DnshObjective) => {
     setCurrentView('dnsh-evaluation');
@@ -261,16 +272,8 @@ const AuthenticatedApp: React.FC = () => {
             />
           </Suspense>
         ) : <div className="p-8">Cliente no encontrado</div>;
-      case 'client-dnsh-evaluation':
-        return selectedClient ? (
-          <Suspense fallback={<LoadingFallback />}>
-            <ClientDnshEvaluationPage
-              client={selectedClient}
-              operations={clientOperations}
-              onBack={handleBackToClientDetail}
-            />
-          </Suspense>
-        ) : <div className="p-8">Cliente no encontrado</div>;
+      // client-dnsh-evaluation removed - unified in dnsh-evaluation
+      // All DNSH evaluations now go through DnshEvaluationEnhancedPage
       case 'map-viewer':
         return (
           <Suspense fallback={<LoadingFallback />}>
@@ -544,12 +547,7 @@ const AuthenticatedApp: React.FC = () => {
                     </button>
                   </>
                 )}
-                {currentView === 'client-dnsh-evaluation' && (
-                  <>
-                    <ChevronRight size={12} />
-                    <span className={theme === 'dark' ? 'text-white font-medium' : 'text-gray-900 font-medium'}>EVALUACIÓN DNSH</span>
-                  </>
-                )}
+                {/* client-dnsh-evaluation removed - unified in dnsh-evaluation */}
                 {selectedOperation && (
                   <>
                     <ChevronRight size={12} />
@@ -577,7 +575,7 @@ const AuthenticatedApp: React.FC = () => {
                   theme === 'dark' ? 'text-white' : 'text-gray-900'
                 }`}>
                  {currentView === 'client-detail' && (selectedClient?.name ? `CLIENT_DETAIL: ${selectedClient.name.toUpperCase().replace(/\s/g, '_')}` : 'CLIENT_DETAIL')}
-                 {currentView === 'client-dnsh-evaluation' && (selectedClient?.name ? `DNSH_EVAL: ${selectedClient.name.toUpperCase().replace(/\s/g, '_')}` : 'DNSH_EVAL_COMPANY')}
+                 {/* client-dnsh-evaluation removed - unified in dnsh-evaluation */}
                  {currentView === 'operation-detail' && (selectedOperation?.name ? `OP_DETAIL: ${selectedOperation.name.toUpperCase().replace(/\s/g, '_')}` : 'OP_DETAIL')}
                  {currentView === 'dnsh-evaluation' && (selectedAssetId 
                    ? (selectedAsset?.name ? `DNSH_EVAL: ${selectedAsset.name.toUpperCase().replace(/\s/g, '_')}` : 'DNSH_EVAL_ASSET')

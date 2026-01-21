@@ -308,7 +308,8 @@ const ClientDetailPage: React.FC<Props> = ({
           </h2>
           <button
             onClick={() => onNavigateToDnshEvaluation(client.id)}
-            className="px-4 py-2 bg-[#00ff88] text-[#0a0a0a] rounded-lg font-medium hover:bg-[#00ff88]/80 transition-colors flex items-center font-mono uppercase tracking-wider text-xs"
+            className="px-4 py-2 bg-[#00ff88] text-[#0a0a0a] rounded-lg font-medium hover:bg-[#00ff88]/80 transition-colors flex items-center font-mono uppercase tracking-wider text-xs focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50"
+            aria-label="Ir a evaluación DNSH detallada"
           >
             EVAL_COMPLETA_DNSH
             <ArrowRight size={16} className="ml-2" />

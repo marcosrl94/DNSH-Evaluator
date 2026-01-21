@@ -1247,7 +1247,7 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
       <div className={`${embedded ? 'flex-1 min-h-0' : 'flex-1'} grid grid-cols-12 gap-6 min-h-0`}>
           
           {/* LEFT: Hazard List */}
-          <div className={`col-span-12 ${embedded ? 'lg:col-span-4' : 'lg:col-span-4'} rounded-xl border flex flex-col overflow-hidden transition-colors ${themeClasses.bg.secondary} ${themeClasses.border.default} ${embedded ? 'h-full' : ''}`}>
+          <div className={`col-span-12 ${embedded ? 'lg:col-span-4' : 'lg:col-span-4'} rounded-xl border flex flex-col overflow-hidden transition-colors ${themeClasses.bg.secondary} ${themeClasses.border.default} ${embedded ? 'h-full max-h-full' : ''}`}>
              {/* Configuration Panel (Step 1) */}
              <div className={`p-4 border-b space-y-3 transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
                 <h3 className={`text-xs font-bold uppercase flex items-center font-mono tracking-wider transition-colors ${themeClasses.text.tertiary}`}>
@@ -1321,7 +1321,8 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
                         <select 
                             value={selectedHorizon}
                         onChange={(e) => setSelectedHorizon(e.target.value as '2030' | '2050' | '2100')}
-                            className={`text-xs rounded p-2 w-full font-medium font-mono uppercase transition-colors ${themeClasses.inputClass}`}
+                            className={`text-xs rounded p-2 w-full font-medium font-mono uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-[#00a8ff]/50 ${themeClasses.inputClass}`}
+                            aria-label="Select time horizon"
                         >
                         <option value="2030">2030_SHORT_TERM</option>
                         <option value="2050">2050_MID_TERM</option>
@@ -1652,12 +1653,12 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
 
           {/* RIGHT: Detail View */}
           <div className="col-span-12 lg:col-span-8 flex flex-col min-h-0 overflow-hidden">
-             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar min-h-0">
+             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar min-h-0" style={{ maxHeight: embedded ? 'calc(100vh - 600px)' : 'none' }}>
                {renderStepContent()}
              </div>
              
              {/* Map Context */}
-             <div className="bg-[#0a0a0a] rounded-xl border border-[#1a1a1a] flex-shrink-0 flex flex-col mt-4" style={{ minHeight: '400px', maxHeight: '500px' }}>
+             <div className="bg-[#0a0a0a] rounded-xl border border-[#1a1a1a] flex-shrink-0 flex flex-col mt-4" style={{ minHeight: '400px', maxHeight: embedded ? '450px' : '500px' }}>
                 <div className="p-4 border-b border-[#1a1a1a] bg-[#111111] flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                     <h4 className="text-xs font-bold text-[#666666] uppercase font-mono tracking-wider">SPATIAL_CONTEXT</h4>
@@ -1692,7 +1693,7 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
                             }}
                         />
                     </div>
-                    <div className="lg:col-span-3 col-span-12 space-y-3 overflow-y-auto">
+                    <div className="lg:col-span-3 col-span-12 space-y-3 overflow-y-auto custom-scrollbar" style={{ maxHeight: embedded ? '400px' : 'none' }}>
                         <RiskBandLegend />
                         <ActiveHazardLegend activeLayers={activeMapLayers} />
                     </div>
