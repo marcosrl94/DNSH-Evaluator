@@ -4,6 +4,7 @@ import { DEMO_OPERATIONS, DEMO_CLIENTS } from '../constants';
 import { Operation, AssetDnshEvaluation, Client } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
+import { getAllOperations, dataStore, getClientOperations } from '../services/dataManagement';
 
 interface Props {
   onNavigateToOperation: (id: string) => void;

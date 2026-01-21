@@ -16,6 +16,7 @@ import { buildAdaptationDecisionTree, recommendAdaptationPathway } from '../serv
 import { EPAdaptationPathwayType } from '../constants/equatorPrinciples';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
+import { updateOperation, updateOperationAssets } from '../services/dataManagement';
 
 interface Props {
   operation: Operation;
@@ -320,7 +321,6 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
     updatedOperation.assets = updatedAssets;
     
     // Update in data store first (ensures all views are notified)
-    const { updateOperation, updateOperationAssets } = require('../services/dataManagement');
     updateOperation(updatedOperation);
     
     // Also update individual asset evaluations in data store

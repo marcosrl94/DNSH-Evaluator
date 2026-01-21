@@ -8,6 +8,7 @@ import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
 import { generateCompanyReport, generatePortfolioReport, generateAssetReport, ReportLevel, ReportSection } from '../services/reportingService';
 import ReportingAIAssistant from '../components/ReportingAIAssistant';
 import { logger } from '../utils/logger';
+import { getAllOperations, dataStore, getClient, getOperation, getClientOperations } from '../services/dataManagement';
 
 const ReportsPage: React.FC = () => {
   // Report level selection
@@ -24,14 +25,12 @@ const ReportsPage: React.FC = () => {
   const reportRef = useRef<HTMLDivElement>(null);
   
   // Get selected entities - use data store for fresh data
-  const { getClient, getOperation, getClientOperations } = require('../services/dataManagement');
-  const [operations, setOperations] = React.useState(() => require('../services/dataManagement').getAllOperations());
+  const [operations, setOperations] = React.useState(() => getAllOperations());
   
   // Subscribe to data store changes
   React.useEffect(() => {
-    const { dataStore } = require('../services/dataManagement');
     const unsubscribe = dataStore.subscribe(() => {
-      setOperations(require('../services/dataManagement').getAllOperations());
+      setOperations(getAllOperations());
     });
     return unsubscribe;
   }, []);

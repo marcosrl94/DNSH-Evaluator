@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
 import { LayoutDashboard, Globe, ShieldCheck, FileText, Menu, X, Settings, BookOpen, LogOut, Briefcase, UserCircle, ChevronRight, Home, Shield } from 'lucide-react';
 import { DEMO_OPERATIONS, DEMO_CLIENTS } from './constants';
 import { Client } from './types';
@@ -9,6 +9,7 @@ import { hasPermission } from './services/auth';
 import { AssetDnshEvaluation, Operation, DnshObjective } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
 import { logger } from './utils/logger';
+import { getAllOperations, dataStore, updateAssetEvaluation, updateOperation as updateOperationInStore } from './services/dataManagement';
 
 // Lazy load heavy components for better performance
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
@@ -46,7 +47,15 @@ const AuthenticatedApp: React.FC = () => {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [clients, setClients] = useState<Client[]>(DEMO_CLIENTS);
-  const [operations, setOperations] = useState(DEMO_OPERATIONS);
+  const [operations, setOperations] = useState<Operation[]>(getAllOperations());
+
+  // Subscribe to data store changes
+  useEffect(() => {
+    const unsubscribe = dataStore.subscribe(() => {
+      setOperations(getAllOperations());
+    });
+    return unsubscribe;
+  }, []);
 
   // Security: Check if user has minimum permissions (after hooks)
   if (!user) {
@@ -98,9 +107,8 @@ const AuthenticatedApp: React.FC = () => {
   const handleUpdateOperation = useCallback((updatedOperation: Operation) => {
     // Update both local state and data store for consistency
     try {
-      const { updateOperation } = require('./services/dataManagement');
-      updateOperation(updatedOperation);
-      setOperations(prev => prev.map(op => op.id === updatedOperation.id ? updatedOperation : op));
+      updateOperationInStore(updatedOperation);
+      // State will be updated automatically via subscription
     } catch (error) {
       logger.error('Error updating operation:', error);
     }
@@ -148,8 +156,6 @@ const AuthenticatedApp: React.FC = () => {
   const handleSaveAssetEvaluation = useCallback((evaluation: AssetDnshEvaluation) => {
     // Update both local state and data store for consistency
     try {
-      const { updateAssetEvaluation, updateOperation } = require('./services/dataManagement');
-      
       // Update in data store (this will notify all subscribers)
       if (updateAssetEvaluation(evaluation.assetId, evaluation)) {
         // Also update local state for immediate UI update
@@ -162,10 +168,8 @@ const AuthenticatedApp: React.FC = () => {
                 : a
             )
           };
-          updateOperation(updatedOperation);
-          setOperations(prev => prev.map(op => 
-            op.id === updatedOperation.id ? updatedOperation : op
-          ));
+          updateOperationInStore(updatedOperation);
+          // State will be updated automatically via subscription
         }
       }
     } catch (error) {

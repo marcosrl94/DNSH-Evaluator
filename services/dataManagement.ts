@@ -170,6 +170,14 @@ export const getOperation = (id: string): Operation | undefined => {
 };
 
 /**
+ * Helper function to get client with fresh data
+ * Always fetches latest from store
+ */
+export const getClient = (id: string): Client | undefined => {
+  return dataStore.getClient(id);
+};
+
+/**
  * Helper function to get all operations with fresh data
  */
 export const getAllOperations = (): Operation[] => {
@@ -200,6 +208,17 @@ export const updateAssetEvaluation = (
  */
 export const updateOperation = (operation: Operation): void => {
   dataStore.updateOperation(operation);
+};
+
+/**
+ * Helper function to update multiple assets in an operation
+ * Ensures all views are notified
+ */
+export const updateOperationAssets = (
+  operationId: string,
+  assetUpdates: Array<{ assetId: string; evaluation: AssetDnshEvaluation }>
+): boolean => {
+  return dataStore.updateOperationAssets(operationId, assetUpdates);
 };
 
 /**
