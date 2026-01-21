@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Asset, HazardType, Client, Operation, DnshObjective } from '../types';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
+import { logger } from '../utils/logger';
 
 interface GlobalMapViewerPageProps {
   onNavigateToOperation?: (operationId: string) => void;
@@ -74,7 +75,7 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
       
       return assets;
     } catch (error) {
-      console.error('Error loading assets:', error);
+      logger.error('Error loading assets:', error);
       return [];
     }
   }, [selectedClientId, selectedOperationId, dnshFilterObjective, dnshFilterStatus]);

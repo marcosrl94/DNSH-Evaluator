@@ -1,26 +1,38 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import { LayoutDashboard, Globe, ShieldCheck, FileText, Menu, X, Settings, BookOpen, LogOut, Briefcase, UserCircle, ChevronRight, Home, Shield } from 'lucide-react';
 import { DEMO_OPERATIONS, DEMO_CLIENTS } from './constants';
 import { Client } from './types';
-import DashboardPage from './pages/Dashboard';
-import UnifiedDashboardPage from './pages/UnifiedDashboard';
-import OperationDetailPage from './pages/OperationDetail';
-import DnshAdaptationPage from './pages/DnshAdaptation'; // Used embedded in DnshEvaluationEnhanced
-import DnshEvaluationEnhancedPage from './pages/DnshEvaluationEnhanced'; // UNIFIED DNSH EVALUATION PAGE
-import OperationsListPage from './pages/OperationsList';
-import GlobalMapViewerPage from './pages/GlobalMapViewer';
-import CatalogsPage from './pages/Catalogs';
-import ReportsPage from './pages/Reports';
-import LoginPage from './pages/Login';
-import ClientDetailPage from './pages/ClientDetail';
-import ClientDnshEvaluationPage from './pages/ClientDnshEvaluation';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import { hasPermission } from './services/auth';
 import { AssetDnshEvaluation, Operation, DnshObjective } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
-import AIAssistant from './components/AIAssistant';
+import { logger } from './utils/logger';
+
+// Lazy load heavy components for better performance
+const DashboardPage = lazy(() => import('./pages/Dashboard'));
+const UnifiedDashboardPage = lazy(() => import('./pages/UnifiedDashboard'));
+const OperationDetailPage = lazy(() => import('./pages/OperationDetail'));
+const DnshEvaluationEnhancedPage = lazy(() => import('./pages/DnshEvaluationEnhanced'));
+const OperationsListPage = lazy(() => import('./pages/OperationsList'));
+const GlobalMapViewerPage = lazy(() => import('./pages/GlobalMapViewer'));
+const CatalogsPage = lazy(() => import('./pages/Catalogs'));
+const ReportsPage = lazy(() => import('./pages/Reports'));
+const LoginPage = lazy(() => import('./pages/Login'));
+const ClientDetailPage = lazy(() => import('./pages/ClientDetail'));
+const ClientDnshEvaluationPage = lazy(() => import('./pages/ClientDnshEvaluation'));
+const AIAssistant = lazy(() => import('./components/AIAssistant'));
+
+// Loading fallback component
+const LoadingFallback: React.FC = () => (
+  <div className="flex items-center justify-center h-screen">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Cargando...</p>
+    </div>
+  </div>
+);
 
 type View = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail' | 'client-dnsh-evaluation' | 'dnsh-evaluation' | 'map-viewer' | 'catalogs' | 'reports';
 
@@ -61,27 +73,49 @@ const AuthenticatedApp: React.FC = () => {
     );
   }
 
-  const selectedClient = clients.find(c => c.id === selectedClientId);
-  const selectedOperation = operations.find(op => op.id === selectedOperationId);
-  const selectedAsset = selectedOperation?.assets.find(a => a.id === selectedAssetId);
+  // Memoize selected entities to avoid recalculation
+  const selectedClient = useMemo(
+    () => clients.find(c => c.id === selectedClientId),
+    [clients, selectedClientId]
+  );
+  
+  const selectedOperation = useMemo(
+    () => operations.find(op => op.id === selectedOperationId),
+    [operations, selectedOperationId]
+  );
+  
+  const selectedAsset = useMemo(
+    () => selectedOperation?.assets.find(a => a.id === selectedAssetId),
+    [selectedOperation, selectedAssetId]
+  );
 
-  const handleUpdateOperation = (updatedOperation: Operation) => {
+  // Memoize client operations
+  const clientOperations = useMemo(
+    () => selectedClient ? operations.filter(op => op.clientId === selectedClient.id) : [],
+    [operations, selectedClient]
+  );
+
+  const handleUpdateOperation = useCallback((updatedOperation: Operation) => {
     // Update both local state and data store for consistency
-    const { updateOperation } = require('./services/dataManagement');
-    updateOperation(updatedOperation);
-    setOperations(prev => prev.map(op => op.id === updatedOperation.id ? updatedOperation : op));
-  };
+    try {
+      const { updateOperation } = require('./services/dataManagement');
+      updateOperation(updatedOperation);
+      setOperations(prev => prev.map(op => op.id === updatedOperation.id ? updatedOperation : op));
+    } catch (error) {
+      logger.error('Error updating operation:', error);
+    }
+  }, []);
 
-  const navigateToOperation = (id: string) => {
+  const navigateToOperation = useCallback((id: string) => {
     const operation = operations.find(op => op.id === id);
     if (operation) {
       setSelectedClientId(operation.clientId);
       setSelectedOperationId(id);
       setCurrentView('operation-detail');
     }
-  };
+  }, [operations]);
 
-  const navigateToClient = (clientId: string) => {
+  const navigateToClient = useCallback((clientId: string) => {
     if (clientId) {
       setSelectedClientId(clientId);
       setSelectedOperationId(null);
@@ -91,17 +125,14 @@ const AuthenticatedApp: React.FC = () => {
       setSelectedOperationId(null);
       setCurrentView('operation-list');
     }
-  };
+  }, []);
 
-  // Removed: navigateToDnshAdaptation, navigateToDnshChecklist
-  // All DNSH evaluations now happen in the unified dnsh-evaluation page
-
-  const navigateToDnshEvaluation = (id: string) => {
+  const navigateToDnshEvaluation = useCallback((id: string) => {
     setSelectedOperationId(id);
     setCurrentView('dnsh-evaluation');
-  };
+  }, []);
 
-  const navigateToAssetEvaluation = (assetId: string) => {
+  const navigateToAssetEvaluation = useCallback((assetId: string) => {
     // Navigate to unified DNSH evaluation with asset selected
     const asset = operations.find(op => op.assets.some(a => a.id === assetId))?.assets.find(a => a.id === assetId);
     if (asset) {
@@ -112,128 +143,192 @@ const AuthenticatedApp: React.FC = () => {
         setCurrentView('dnsh-evaluation');
       }
     }
-  };
+  }, [operations]);
 
-  const handleSaveAssetEvaluation = (evaluation: AssetDnshEvaluation) => {
+  const handleSaveAssetEvaluation = useCallback((evaluation: AssetDnshEvaluation) => {
     // Update both local state and data store for consistency
-    const { updateAssetEvaluation, updateOperation } = require('./services/dataManagement');
-    
-    // Update in data store (this will notify all subscribers)
-    if (updateAssetEvaluation(evaluation.assetId, evaluation)) {
-      // Also update local state for immediate UI update
-      if (selectedOperation && selectedAsset) {
-        const updatedOperation = {
-          ...selectedOperation,
-          assets: selectedOperation.assets.map(a =>
-            a.id === selectedAsset.id
-              ? { ...a, dnshEvaluation: evaluation }
-              : a
-          )
-        };
-        updateOperation(updatedOperation);
-        setOperations(prev => prev.map(op => 
-          op.id === updatedOperation.id ? updatedOperation : op
-        ));
+    try {
+      const { updateAssetEvaluation, updateOperation } = require('./services/dataManagement');
+      
+      // Update in data store (this will notify all subscribers)
+      if (updateAssetEvaluation(evaluation.assetId, evaluation)) {
+        // Also update local state for immediate UI update
+        if (selectedOperation && selectedAsset) {
+          const updatedOperation = {
+            ...selectedOperation,
+            assets: selectedOperation.assets.map(a =>
+              a.id === selectedAsset.id
+                ? { ...a, dnshEvaluation: evaluation }
+                : a
+            )
+          };
+          updateOperation(updatedOperation);
+          setOperations(prev => prev.map(op => 
+            op.id === updatedOperation.id ? updatedOperation : op
+          ));
+        }
       }
+    } catch (error) {
+      logger.error('Error saving asset evaluation:', error);
     }
-  };
+  }, [selectedOperation, selectedAsset]);
 
-  const renderContent = () => {
+  // Memoize navigation handlers
+  const handleNavigateToDnshEvaluationWithAsset = useCallback((operationId: string, assetId?: string | null) => {
+    setSelectedOperationId(operationId);
+    setSelectedAssetId(assetId || null);
+    setCurrentView('dnsh-evaluation');
+  }, []);
+
+  const handleNavigateToClientDnshEvaluation = useCallback((clientId: string) => {
+    setSelectedClientId(clientId);
+    setCurrentView('client-dnsh-evaluation');
+  }, []);
+
+  const handleNavigateToDnshObjective = useCallback((objective: DnshObjective) => {
+    setCurrentView('dnsh-evaluation');
+    // Store the objective to navigate to in state (we'll handle this in DnshEvaluationPage)
+  }, []);
+
+  const handleBackToOperationDetail = useCallback(() => {
+    setSelectedAssetId(null);
+    setCurrentView('operation-detail');
+  }, []);
+
+  const handleBackToClientDetail = useCallback(() => {
+    setCurrentView('client-detail');
+  }, []);
+
+  const handleBackToOperationList = useCallback(() => {
+    setCurrentView('operation-list');
+  }, []);
+
+  const handleNavigateToDnshEvaluationFromMap = useCallback((operationId: string, objective?: DnshObjective) => {
+    const operation = operations.find(op => op.id === operationId);
+    if (operation) {
+      setSelectedOperationId(operationId);
+      setCurrentView('dnsh-evaluation');
+      // TODO: Navigate to specific objective if provided
+    }
+  }, [operations]);
+
+  const renderContent = useMemo(() => {
     switch (currentView) {
       case 'dashboard':
         return (
-          <UnifiedDashboardPage 
-            onNavigateToOperation={navigateToOperation}
-            onNavigateToClient={navigateToClient}
-            onNavigateToAssetEvaluation={navigateToAssetEvaluation}
-            onNavigateToDnshEvaluation={(operationId, assetId) => {
-              setSelectedOperationId(operationId);
-              setSelectedAssetId(assetId || null);
-              setCurrentView('dnsh-evaluation');
-            }}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <UnifiedDashboardPage 
+              onNavigateToOperation={navigateToOperation}
+              onNavigateToClient={navigateToClient}
+              onNavigateToAssetEvaluation={navigateToAssetEvaluation}
+              onNavigateToDnshEvaluation={handleNavigateToDnshEvaluationWithAsset}
+            />
+          </Suspense>
         );
       case 'operation-list':
-        return <OperationsListPage onNavigateToOperation={navigateToOperation} selectedClientId={selectedClientId} onNavigateToClient={navigateToClient} />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <OperationsListPage 
+              onNavigateToOperation={navigateToOperation} 
+              selectedClientId={selectedClientId} 
+              onNavigateToClient={navigateToClient} 
+            />
+          </Suspense>
+        );
       case 'client-detail':
         return selectedClient ? (
-          <ClientDetailPage 
-            client={selectedClient}
-            operations={operations.filter(op => op.clientId === selectedClient.id)}
-            onNavigateToOperation={navigateToOperation}
-            onNavigateToDnshEvaluation={(clientId: string) => {
-              setSelectedClientId(clientId);
-              setCurrentView('client-dnsh-evaluation');
-            }}
-            onBack={() => navigateToClient('')}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <ClientDetailPage 
+              client={selectedClient}
+              operations={clientOperations}
+              onNavigateToOperation={navigateToOperation}
+              onNavigateToDnshEvaluation={handleNavigateToClientDnshEvaluation}
+              onBack={() => navigateToClient('')}
+            />
+          </Suspense>
         ) : <div className="p-8">Cliente no encontrado</div>;
       case 'client-dnsh-evaluation':
         return selectedClient ? (
-          <ClientDnshEvaluationPage
-            client={selectedClient}
-            operations={operations.filter(op => op.clientId === selectedClient.id)}
-            onBack={() => setCurrentView('client-detail')}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <ClientDnshEvaluationPage
+              client={selectedClient}
+              operations={clientOperations}
+              onBack={handleBackToClientDetail}
+            />
+          </Suspense>
         ) : <div className="p-8">Cliente no encontrado</div>;
       case 'map-viewer':
         return (
-          <GlobalMapViewerPage 
-            onNavigateToOperation={navigateToOperation}
-            onNavigateToAssetEvaluation={navigateToAssetEvaluation}
-            onNavigateToDnshEvaluation={(operationId: string, objective?: DnshObjective) => {
-              const operation = operations.find(op => op.id === operationId);
-              if (operation) {
-                setSelectedOperationId(operationId);
-                setCurrentView('dnsh-evaluation');
-                // TODO: Navigate to specific objective if provided
-              }
-            }}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <GlobalMapViewerPage 
+              onNavigateToOperation={navigateToOperation}
+              onNavigateToAssetEvaluation={navigateToAssetEvaluation}
+              onNavigateToDnshEvaluation={handleNavigateToDnshEvaluationFromMap}
+            />
+          </Suspense>
         );
       case 'catalogs':
-        return <CatalogsPage />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <CatalogsPage />
+          </Suspense>
+        );
       case 'reports':
-        return <ReportsPage />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <ReportsPage />
+          </Suspense>
+        );
       case 'operation-detail':
         return selectedOperation ? (
-          <OperationDetailPage 
-            operation={selectedOperation} 
-            onNavigateToDnshEvaluation={() => {
-              setCurrentView('dnsh-evaluation');
-            }}
-            onNavigateToDnshObjective={(objective: DnshObjective) => {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/3643d2bc-84c4-48ef-965a-acea6e50f48b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:122',message:'onNavigateToDnshObjective called',data:{objective,currentView},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-              // #endregion
-              setCurrentView('dnsh-evaluation');
-              // Store the objective to navigate to in state (we'll handle this in DnshEvaluationPage)
-              // For now, just navigate to evaluation page
-            }}
-            onNavigateToAssetEvaluation={navigateToAssetEvaluation}
-            onBack={() => setCurrentView('operation-list')}
-            onUpdateOperation={handleUpdateOperation}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <OperationDetailPage 
+              operation={selectedOperation} 
+              onNavigateToDnshEvaluation={() => setCurrentView('dnsh-evaluation')}
+              onNavigateToDnshObjective={handleNavigateToDnshObjective}
+              onNavigateToAssetEvaluation={navigateToAssetEvaluation}
+              onBack={handleBackToOperationList}
+              onUpdateOperation={handleUpdateOperation}
+            />
+          </Suspense>
         ) : <div>Operation not found</div>;
-      // All DNSH evaluations unified in 'dnsh-evaluation' case below
-      // Removed routes: asset-evaluation, dnsh-adaptation, dnsh-checklist
-      // These functionalities are now integrated in DnshEvaluationEnhancedPage
       case 'dnsh-evaluation':
         return selectedOperation ? (
-          <DnshEvaluationEnhancedPage 
-            operation={selectedOperation} 
-            onBack={() => {
-              setSelectedAssetId(null);
-              setCurrentView('operation-detail');
-            }}
-            onUpdateOperation={handleUpdateOperation}
-            initialAssetId={selectedAssetId}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <DnshEvaluationEnhancedPage 
+              operation={selectedOperation} 
+              onBack={handleBackToOperationDetail}
+              onUpdateOperation={handleUpdateOperation}
+              initialAssetId={selectedAssetId}
+            />
+          </Suspense>
         ) : <div>Operation not found</div>;
       default:
-        return <DashboardPage onNavigateToOperation={navigateToOperation} />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <DashboardPage onNavigateToOperation={navigateToOperation} />
+          </Suspense>
+        );
     }
-  };
+  }, [
+    currentView,
+    selectedClient,
+    selectedOperation,
+    selectedAssetId,
+    selectedClientId,
+    clientOperations,
+    navigateToOperation,
+    navigateToClient,
+    navigateToAssetEvaluation,
+    handleUpdateOperation,
+    handleNavigateToDnshEvaluationWithAsset,
+    handleNavigateToClientDnshEvaluation,
+    handleNavigateToDnshObjective,
+    handleBackToOperationDetail,
+    handleBackToClientDetail,
+    handleBackToOperationList,
+    handleNavigateToDnshEvaluationFromMap,
+  ]);
 
   return (
     <div className={`flex h-screen overflow-hidden font-sans transition-colors ${
@@ -484,21 +579,32 @@ const AuthenticatedApp: React.FC = () => {
         )}
 
         <div className={`flex-1 ${currentView === 'map-viewer' ? 'overflow-hidden relative' : 'overflow-auto'}`}>
-          {renderContent()}
+          {renderContent}
         </div>
       </main>
 
       {/* AI Assistant - Available globally */}
-      <AIAssistant 
-        operations={operations}
-        currentOperation={selectedOperation || undefined}
-        currentAsset={selectedAsset || undefined}
-      />
+      <Suspense fallback={null}>
+        <AIAssistant 
+          operations={operations}
+          currentOperation={selectedOperation || undefined}
+          currentAsset={selectedAsset || undefined}
+        />
+      </Suspense>
     </div>
   );
 };
 
-const SidebarItem = ({ icon, label, isOpen, isActive, onClick, theme }: any) => (
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  isOpen: boolean;
+  isActive: boolean;
+  onClick: () => void;
+  theme: 'light' | 'dark';
+}
+
+const SidebarItem = React.memo<SidebarItemProps>(({ icon, label, isOpen, isActive, onClick, theme }) => (
   <button 
     onClick={onClick}
     className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-all group font-mono border-l-4 ${
@@ -518,7 +624,7 @@ const SidebarItem = ({ icon, label, isOpen, isActive, onClick, theme }: any) => 
     }`}>{icon}</span>
     {isOpen && <span className="font-medium text-xs tracking-widest uppercase">{label}</span>}
   </button>
-);
+));
 
 // Wrapper for Context
 const App: React.FC = () => {

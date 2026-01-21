@@ -6,6 +6,7 @@ import { determineAllHazardScopes, ScopeDeterminationResult } from '../services/
 import { getCORDEXData } from '../services/cordexData';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
+import { logger } from '../utils/logger';
 
 interface AssetDetailPanelProps {
   asset: Asset;
@@ -19,7 +20,7 @@ const AssetDetailPanel: React.FC<AssetDetailPanelProps> = ({ asset, onClose, onN
     try {
       return getThemeClasses(theme || 'dark');
     } catch (error) {
-      console.error('Error getting theme classes:', error);
+      logger.error('Error getting theme classes:', error);
       return getThemeClasses('dark');
     }
   }, [theme]);
@@ -45,7 +46,7 @@ const AssetDetailPanel: React.FC<AssetDetailPanelProps> = ({ asset, onClose, onN
         const scopes = await determineAllHazardScopes(asset, ClimateScenario.SSP2_45);
         setAutoScopes(scopes);
       } catch (error) {
-        console.error('Error determining hazard scopes:', error);
+        logger.error('Error determining hazard scopes:', error);
       } finally {
         setLoadingScopes(false);
       }
@@ -163,7 +164,7 @@ const AssetDetailPanel: React.FC<AssetDetailPanelProps> = ({ asset, onClose, onN
         
         setHazardKPIs(kpis);
       } catch (error) {
-        console.error('Error calculating KPIs:', error);
+        logger.error('Error calculating KPIs:', error);
       } finally {
         setLoadingKPIs(false);
       }

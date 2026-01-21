@@ -5,6 +5,7 @@ import { EPAdaptationMeasureCategory } from '../constants/equatorPrinciples';
 import { Search, Tag, Info, PenTool, Database, AlertCircle, Shield } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
+import { logger } from '../utils/logger';
 
 const CatalogsPage: React.FC = () => {
   const { theme } = useTheme();
@@ -16,10 +17,10 @@ const CatalogsPage: React.FC = () => {
   const allMeasures = useMemo(() => {
     try {
       const measures = getAllMeasures();
-      console.log('CatalogsPage: Loaded measures', measures.length);
+      logger.debug('CatalogsPage: Loaded measures', measures.length);
       return measures;
     } catch (error) {
-      console.error('CatalogsPage: Error loading measures', error);
+      logger.error('CatalogsPage: Error loading measures', error);
       return [];
     }
   }, []);
@@ -63,7 +64,7 @@ const CatalogsPage: React.FC = () => {
       filtered = filtered.filter(m => m && m.category === selectedCategory);
     }
     
-    console.log('CatalogsPage: Filtered measures', filtered.length, 'from', allMeasures.length, 'searchTerm:', searchTerm, 'category:', selectedCategory);
+    logger.debug('CatalogsPage: Filtered measures', filtered.length, 'from', allMeasures.length, 'searchTerm:', searchTerm, 'category:', selectedCategory);
     return filtered;
   }, [allMeasures, searchTerm, selectedCategory]);
 

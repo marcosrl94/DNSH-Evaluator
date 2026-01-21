@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
 import { Asset, HazardType, KeyBiodiversityArea, WaterRiskZone } from '../types';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
+import { logger } from '../utils/logger';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet default icon issue - only once globally
@@ -471,7 +472,7 @@ const MapViewer: React.FC<MapViewerProps> = ({
       );
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 8 });
     } catch (error) {
-      console.error('Error fitting bounds:', error);
+      logger.error('Error fitting bounds:', error);
     }
   };
 

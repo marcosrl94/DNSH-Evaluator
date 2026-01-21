@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { DEMO_OPERATIONS } from '../constants';
 import { Operation, Asset } from '../types';
+import { formatLargeNumber } from '../utils/common';
+import { logger } from '../utils/logger';
 
 interface Message {
   id: string;
@@ -49,8 +51,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
     }
   }, [isOpen]);
 
-  // Build context for AI
-  const buildContext = (): string => {
+  // Memoize context building to avoid recalculation
+  const buildContext = useCallback((): string => {
     let context = `Eres un asistente experto en DNSH (Do No Significant Harm) y Taxonomía Europea. `;
     context += `Estás ayudando a usuarios de una plataforma de evaluación DNSH para inversiones sostenibles.\n\n`;
     
@@ -58,7 +60,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
       context += `CONTEXTO DE OPERACIONES:\n`;
       context += `Total de operaciones: ${operations.length}\n`;
       operations.forEach(op => {
-        context += `- ${op.name} (${op.id}): ${op.assets.length} activos, ${op.country}, Sector NACE ${op.sectorNACE}, CAPEX €${(op.capex / 1000000).toFixed(1)}M, Estado: ${op.status}\n`;
+        context += `- ${op.name} (${op.id}): ${op.assets.length} activos, ${op.country}, Sector NACE ${op.sectorNACE}, CAPEX ${formatLargeNumber(op.capex)}, Estado: ${op.status}\n`;
       });
       context += `\n`;
     }
@@ -70,7 +72,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
       context += `Sector NACE: ${currentOperation.sectorNACE}\n`;
       context += `Activos: ${currentOperation.assets.length}\n`;
       currentOperation.assets.forEach(asset => {
-        context += `  - ${asset.name}: ${asset.assetType}, Valor €${(asset.exposedValue / 1000000).toFixed(1)}M\n`;
+        context += `  - ${asset.name}: ${asset.assetType}, Valor ${formatLargeNumber(asset.exposedValue)}\n`;
         if (asset.dnshEvaluation) {
           context += `    Estado DNSH: ${asset.dnshEvaluation.overallStatus}\n`;
         }
@@ -83,7 +85,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
       context += `Nombre: ${currentAsset.name}\n`;
       context += `Tipo: ${currentAsset.assetType}\n`;
       context += `Ubicación: Lat ${currentAsset.lat}, Lng ${currentAsset.lng}\n`;
-      context += `Valor: €${(currentAsset.exposedValue / 1000000).toFixed(1)}M\n`;
+      context += `Valor: ${formatLargeNumber(currentAsset.exposedValue)}\n`;
       if (currentAsset.dnshEvaluation) {
         context += `Evaluación DNSH:\n`;
         context += `  Mitigación: ${currentAsset.dnshEvaluation.mitigationStatus}\n`;
@@ -109,7 +111,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
     context += `Siempre menciona referencias a la Taxonomía Europea cuando sea relevante.`;
 
     return context;
-  };
+  }, [operations, currentOperation, currentAsset]);
 
   // Simulate AI response (replace with actual API call)
   const getAIResponse = async (userMessage: string): Promise<string> => {
@@ -126,14 +128,14 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
 
     if (lowerMessage.includes('operacion') || lowerMessage.includes('operación')) {
       if (currentOperation) {
-        return `La operación actual es **${currentOperation.name}**:\n\n• País: ${currentOperation.country}\n• Sector NACE: ${currentOperation.sectorNACE}\n• Activos: ${currentOperation.assets.length}\n• CAPEX Total: €${(currentOperation.capex / 1000000).toFixed(1)}M\n• Estado: ${currentOperation.status}\n\n${currentOperation.assets.map(a => `- ${a.name} (${a.assetType}): €${(a.exposedValue / 1000000).toFixed(1)}M`).join('\n')}`;
+        return `La operación actual es **${currentOperation.name}**:\n\n• País: ${currentOperation.country}\n• Sector NACE: ${currentOperation.sectorNACE}\n• Activos: ${currentOperation.assets.length}\n• CAPEX Total: ${formatLargeNumber(currentOperation.capex)}\n• Estado: ${currentOperation.status}\n\n${currentOperation.assets.map(a => `- ${a.name} (${a.assetType}): ${formatLargeNumber(a.exposedValue)}`).join('\n')}`;
       }
       return `Hay ${operations.length} operaciones en total:\n\n${operations.map(op => `• ${op.name}: ${op.assets.length} activos, ${op.country}`).join('\n')}\n\n¿Sobre cuál operación quieres más información?`;
     }
 
     if (lowerMessage.includes('asset') || lowerMessage.includes('activo')) {
       if (currentAsset) {
-        return `El asset actual es **${currentAsset.name}**:\n\n• Tipo: ${currentAsset.assetType}\n• Valor: €${(currentAsset.exposedValue / 1000000).toFixed(1)}M\n• Ubicación: ${currentAsset.lat.toFixed(4)}, ${currentAsset.lng.toFixed(4)}\n${currentAsset.dnshEvaluation ? `• Estado DNSH: ${currentAsset.dnshEvaluation.overallStatus}` : '• Evaluación DNSH: Pendiente'}`;
+        return `El asset actual es **${currentAsset.name}**:\n\n• Tipo: ${currentAsset.assetType}\n• Valor: ${formatLargeNumber(currentAsset.exposedValue)}\n• Ubicación: ${currentAsset.lat.toFixed(4)}, ${currentAsset.lng.toFixed(4)}\n${currentAsset.dnshEvaluation ? `• Estado DNSH: ${currentAsset.dnshEvaluation.overallStatus}` : '• Evaluación DNSH: Pendiente'}`;
       }
       return 'No hay un asset seleccionado actualmente. ¿Sobre qué asset te gustaría información?';
     }
@@ -169,7 +171,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
            `• Documentación requerida`;
   };
 
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -198,6 +200,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
+      logger.error('Error in AI assistant:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -208,14 +211,14 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [input, isLoading, getAIResponse]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  };
+  }, [handleSend]);
 
   return (
     <>

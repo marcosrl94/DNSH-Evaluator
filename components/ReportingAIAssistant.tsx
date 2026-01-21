@@ -3,6 +3,7 @@ import { Sparkles, Edit3, Lightbulb, FileText, X, Send, Bot, User, Loader2, Chec
 import { ReportSection, ReportSectionType } from '../services/reportingService';
 import { generateReportSection, modifyReportContent, generateJustification, generateSuggestions, AISuggestion } from '../services/aiGenService';
 import { DnshObjective, EvidenceDocument, Asset, Operation, Client } from '../types';
+import { logger } from '../utils/logger';
 
 interface ReportingAIAssistantProps {
   currentSection?: ReportSection;
@@ -65,7 +66,7 @@ const ReportingAIAssistant: React.FC<ReportingAIAssistantProps> = ({
       const aiSuggestions = await generateSuggestions(context);
       setSuggestions(aiSuggestions);
     } catch (error) {
-      console.error('Error loading suggestions:', error);
+      logger.error('Error loading suggestions:', error);
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +90,7 @@ const ReportingAIAssistant: React.FC<ReportingAIAssistantProps> = ({
         onSectionUpdate(currentSection.id, response.content);
       }
     } catch (error) {
-      console.error('Error regenerating section:', error);
+      logger.error('Error regenerating section:', error);
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +113,7 @@ const ReportingAIAssistant: React.FC<ReportingAIAssistantProps> = ({
         onSectionUpdate(currentSection.id, response.content);
       }
     } catch (error) {
-      console.error('Error modifying content:', error);
+      logger.error('Error modifying content:', error);
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +132,7 @@ const ReportingAIAssistant: React.FC<ReportingAIAssistantProps> = ({
       // Remove applied suggestion
       setSuggestions(prev => prev.filter(s => s.title !== suggestion.title));
     } catch (error) {
-      console.error('Error applying suggestion:', error);
+      logger.error('Error applying suggestion:', error);
     } finally {
       setIsLoading(false);
     }
@@ -156,7 +157,7 @@ const ReportingAIAssistant: React.FC<ReportingAIAssistantProps> = ({
         onSectionUpdate(currentSection.id, justification);
       }
     } catch (error) {
-      console.error('Error generating justification:', error);
+      logger.error('Error generating justification:', error);
     } finally {
       setIsLoading(false);
     }

@@ -5,12 +5,13 @@
  * with memoization and performance optimizations
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Asset, Operation, AdaptationAssessment, RiskResult, ClimateScenario } from '../types';
 import { computeOperationRisk } from '../services/riskEngine';
 import { filterRelevantHazards } from '../utils/hazardFiltering';
 import { EU_TAXONOMY_HAZARDS } from '../constants';
 import { getIntegratedClimateData, IntegratedClimateData } from '../services/climateDataIntegration';
+import { logger } from '../utils/logger';
 
 interface UseAdaptationAssessmentOptions {
   operation: Operation;
@@ -87,12 +88,20 @@ export const useAdaptationAssessment = ({
     });
   }, [assetsToEvaluate, relevantHazards, selectedScenario, selectedHorizon]);
 
+  // Use ref to track timeout and prevent memory leaks
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Recalculate risk assessments
   const recalculate = useCallback(() => {
+    // Clear any pending timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
     setLoading(true);
     
     // Use setTimeout to debounce rapid changes
-    const timer = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       try {
         const result = computeOperationRisk(assetsToEvaluate, selectedScenario, selectedHorizon);
         
@@ -104,20 +113,26 @@ export const useAdaptationAssessment = ({
         setAssessments(filteredAssessments);
         setRisks(result.risks);
       } catch (error) {
-        console.error('Error calculating risk assessments:', error);
+        logger.error('Error calculating risk assessments:', error);
         setAssessments([]);
         setRisks([]);
       } finally {
         setLoading(false);
+        timeoutRef.current = null;
       }
     }, 300); // 300ms debounce
-
-    return () => clearTimeout(timer);
   }, [assetsToEvaluate, selectedScenario, selectedHorizon, relevantHazards]);
 
   // Recalculate when dependencies change
   useEffect(() => {
     recalculate();
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [recalculate]);
 
   return {

@@ -7,6 +7,7 @@ import MapViewer from '../components/MapViewer';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
 import { generateCompanyReport, generatePortfolioReport, generateAssetReport, ReportLevel, ReportSection } from '../services/reportingService';
 import ReportingAIAssistant from '../components/ReportingAIAssistant';
+import { logger } from '../utils/logger';
 
 const ReportsPage: React.FC = () => {
   // Report level selection
@@ -341,7 +342,7 @@ const ReportsPage: React.FC = () => {
           pdfGenerationAvailable = true;
         }
       } catch (importError) {
-        console.warn('PDF libraries not available, using print dialog');
+        logger.warn('PDF libraries not available, using print dialog');
         pdfGenerationAvailable = false;
       }
       
@@ -395,7 +396,7 @@ const ReportsPage: React.FC = () => {
         window.print();
       }
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      logger.error('Error generating PDF:', error);
       // Fallback to print dialog
       window.print();
     } finally {

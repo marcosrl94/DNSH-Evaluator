@@ -22,6 +22,40 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        // Optimize bundle size
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              // Vendor chunks
+              if (id.includes('node_modules')) {
+                if (id.includes('react') || id.includes('react-dom')) {
+                  return 'react-vendor';
+                }
+                if (id.includes('leaflet')) {
+                  return 'leaflet-vendor';
+                }
+                if (id.includes('lucide-react')) {
+                  return 'lucide-vendor';
+                }
+                if (id.includes('jspdf') || id.includes('html2canvas')) {
+                  return 'pdf-vendor';
+                }
+                // Other node_modules
+                return 'vendor';
+              }
+            },
+          },
+        },
+        // Increase chunk size warning limit
+        chunkSizeWarningLimit: 1000,
+        // Optimize for production (esbuild is faster than terser)
+        minify: 'esbuild',
+      },
+      // Optimize dependencies
+      optimizeDeps: {
+        include: ['react', 'react-dom', 'leaflet', 'react-leaflet'],
+      },
     };
 });
