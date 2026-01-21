@@ -220,7 +220,7 @@ const AssetDetailPanel: React.FC<AssetDetailPanelProps> = ({ asset, onClose, onN
   };
 
   return (
-    <div className={`absolute top-4 right-4 w-96 rounded-xl border z-[1000] max-h-[90vh] flex flex-col transition-colors ${themeClasses.card.bg} ${themeClasses.card.border}`}>
+    <div className={`absolute top-4 right-4 w-96 max-w-[calc(100vw-2rem)] rounded-xl border z-[1000] max-h-[90vh] flex flex-col transition-colors ${themeClasses.card.bg} ${themeClasses.card.border}`}>
       {/* Header */}
       <div className="flex-shrink-0 bg-gradient-to-r from-[#00ff88] to-[#00a8ff] text-[#0a0a0a] p-4 rounded-t-xl flex items-start justify-between">
         <div className="flex-1 min-w-0">
@@ -422,8 +422,8 @@ const AssetDetailPanel: React.FC<AssetDetailPanelProps> = ({ asset, onClose, onN
 
         {/* KPI Popup Modal */}
         {showKPIPopup && (
-          <div className="fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4" onClick={() => setShowKPIPopup(false)}>
-            <div className="bg-[#0a0a0a] rounded-xl border border-[#1a1a1a] max-w-4xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setShowKPIPopup(false)}>
+            <div className="bg-[#0a0a0a] rounded-xl border border-[#1a1a1a] max-w-4xl w-full max-h-[90vh] my-auto flex flex-col min-h-0" onClick={(e) => e.stopPropagation()}>
               {/* Popup Header */}
               <div className="flex-shrink-0 bg-gradient-to-r from-[#ffb800] to-purple-500 text-[#0a0a0a] p-4 rounded-t-xl flex items-center justify-between">
                 <div>

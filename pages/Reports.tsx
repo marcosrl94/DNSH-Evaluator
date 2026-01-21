@@ -9,8 +9,13 @@ import { generateCompanyReport, generatePortfolioReport, generateAssetReport, Re
 import ReportingAIAssistant from '../components/ReportingAIAssistant';
 import { logger } from '../utils/logger';
 import { getAllOperations, dataStore, getClient, getOperation, getClientOperations } from '../services/dataManagement';
+import { useTheme } from '../context/ThemeContext';
+import { getThemeClasses } from '../utils/themeUtils';
 
 const ReportsPage: React.FC = () => {
+  const { theme, toggleTheme } = useTheme();
+  const themeClasses = getThemeClasses(theme);
+  
   // Report level selection
   const [reportLevel, setReportLevel] = useState<ReportLevel>(ReportLevel.PORTFOLIO);
   const [selectedClientId, setSelectedClientId] = useState<string>(DEMO_CLIENTS[0]?.id || '');
@@ -269,26 +274,26 @@ const ReportsPage: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'Compliant':
-        return <CheckCircle size={20} className="text-emerald-500" />;
+        return <CheckCircle size={20} className={theme === 'dark' ? 'text-[#00ff88]' : 'text-emerald-600'} />;
       case 'Non-Compliant':
-        return <XCircle size={20} className="text-red-500" />;
+        return <XCircle size={20} className={theme === 'dark' ? 'text-red-400' : 'text-red-600'} />;
       case 'Conditional':
-        return <AlertTriangle size={20} className="text-amber-500" />;
+        return <AlertTriangle size={20} className={theme === 'dark' ? 'text-[#ffb800]' : 'text-amber-600'} />;
       default:
-        return <FileText size={20} className="text-slate-400" />;
+        return <FileText size={20} className={themeClasses.text.tertiary} />;
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'Compliant':
-        return 'bg-emerald-50 border-emerald-200 text-emerald-800';
+        return themeClasses.badge.success;
       case 'Non-Compliant':
-        return 'bg-red-50 border-red-200 text-red-800';
+        return themeClasses.badge.danger;
       case 'Conditional':
-        return 'bg-amber-50 border-amber-200 text-amber-800';
+        return themeClasses.badge.warning;
       default:
-        return 'bg-slate-50 border-slate-200 text-slate-600';
+        return themeClasses.badge.neutral;
     }
   };
 
@@ -404,23 +409,25 @@ const ReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
+    <div className={`h-full flex flex-col overflow-hidden transition-colors ${themeClasses.bg.secondary}`}>
       {/* Toolbar */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm print:hidden">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-2xl font-bold text-slate-900">Generador de Reportes DNSH</h2>
-          <div className="h-6 w-px bg-slate-300 mx-2"></div>
+      <div className={`${themeClasses.bg.card} ${themeClasses.border.default} border-b px-4 md:px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm print:hidden transition-colors flex-shrink-0`}>
+        <div className="flex flex-col md:flex-row items-start md:items-center space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
+          <h2 className={`text-xl md:text-2xl font-bold transition-colors ${themeClasses.text.primary}`}>Generador de Reportes DNSH</h2>
+          <div className={`hidden md:block h-6 w-px mx-2 transition-colors ${theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-gray-300'}`}></div>
           
           {/* Level Selection */}
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-slate-600 font-medium">Nivel:</span>
-            <div className="flex bg-slate-100 rounded-lg p-1">
+            <span className={`text-sm font-medium transition-colors ${themeClasses.text.secondary}`}>Nivel:</span>
+            <div className={`flex rounded-lg p-1 transition-colors ${theme === 'dark' ? 'bg-[#111111]' : 'bg-gray-100'}`}>
               <button
                 onClick={() => setReportLevel(ReportLevel.COMPANY)}
                 className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center space-x-1 ${
                   reportLevel === ReportLevel.COMPANY
-                    ? 'bg-white text-emerald-600 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? theme === 'dark' 
+                      ? 'bg-[#0a0a0a] text-[#00ff88] shadow-sm' 
+                      : 'bg-white text-emerald-600 shadow-sm'
+                    : themeClasses.text.secondary + ' ' + (theme === 'dark' ? 'hover:text-white' : 'hover:text-gray-900')
                 }`}
               >
                 <Building2 size={16} />
@@ -430,8 +437,10 @@ const ReportsPage: React.FC = () => {
                 onClick={() => setReportLevel(ReportLevel.PORTFOLIO)}
                 className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center space-x-1 ${
                   reportLevel === ReportLevel.PORTFOLIO
-                    ? 'bg-white text-emerald-600 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? theme === 'dark' 
+                      ? 'bg-[#0a0a0a] text-[#00ff88] shadow-sm' 
+                      : 'bg-white text-emerald-600 shadow-sm'
+                    : themeClasses.text.secondary + ' ' + (theme === 'dark' ? 'hover:text-white' : 'hover:text-gray-900')
                 }`}
               >
                 <Briefcase size={16} />
@@ -441,8 +450,10 @@ const ReportsPage: React.FC = () => {
                 onClick={() => setReportLevel(ReportLevel.ASSET)}
                 className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center space-x-1 ${
                   reportLevel === ReportLevel.ASSET
-                    ? 'bg-white text-emerald-600 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? theme === 'dark' 
+                      ? 'bg-[#0a0a0a] text-[#00ff88] shadow-sm' 
+                      : 'bg-white text-emerald-600 shadow-sm'
+                    : themeClasses.text.secondary + ' ' + (theme === 'dark' ? 'hover:text-white' : 'hover:text-gray-900')
                 }`}
               >
                 <Layers size={16} />
@@ -452,12 +463,12 @@ const ReportsPage: React.FC = () => {
           </div>
           
           {/* Entity Selection */}
-          <div className="h-6 w-px bg-slate-300 mx-2"></div>
+          <div className={`hidden md:block h-6 w-px mx-2 transition-colors ${theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-gray-300'}`}></div>
           {reportLevel === ReportLevel.COMPANY && (
             <select
               value={selectedClientId}
               onChange={(e) => setSelectedClientId(e.target.value)}
-              className="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block px-3 py-2 min-w-[200px] shadow-sm"
+              className={`${themeClasses.inputClass} text-sm rounded-lg block px-3 py-2 min-w-[200px] shadow-sm`}
             >
               {DEMO_CLIENTS.map(client => (
                 <option key={client.id} value={client.id}>{client.name}</option>
@@ -468,7 +479,7 @@ const ReportsPage: React.FC = () => {
             <select
               value={selectedOpId}
               onChange={(e) => setSelectedOpId(e.target.value)}
-              className="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block px-3 py-2 min-w-[280px] shadow-sm"
+              className={`${themeClasses.inputClass} text-sm rounded-lg block px-3 py-2 min-w-[280px] shadow-sm`}
             >
               {DEMO_OPERATIONS.map(op => (
                 <option key={op.id} value={op.id}>{op.name}</option>
@@ -483,7 +494,7 @@ const ReportsPage: React.FC = () => {
                   setSelectedOpId(e.target.value);
                   setSelectedAssetId('');
                 }}
-                className="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block px-3 py-2 min-w-[200px] shadow-sm"
+                className={`${themeClasses.inputClass} text-sm rounded-lg block px-3 py-2 min-w-[200px] shadow-sm`}
               >
                 {DEMO_OPERATIONS.map(op => (
                   <option key={op.id} value={op.id}>{op.name}</option>
@@ -493,7 +504,7 @@ const ReportsPage: React.FC = () => {
                 <select
                   value={selectedAssetId}
                   onChange={(e) => setSelectedAssetId(e.target.value)}
-                  className="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block px-3 py-2 min-w-[200px] shadow-sm ml-2"
+                  className={`${themeClasses.inputClass} text-sm rounded-lg block px-3 py-2 min-w-[200px] shadow-sm ml-2`}
                 >
                   <option value="">Seleccionar Asset</option>
                   {selectedOperation.assets.map(asset => (
@@ -504,27 +515,52 @@ const ReportsPage: React.FC = () => {
             </>
           )}
         </div>
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2 text-sm text-slate-600">
-            <Sparkles size={16} className="text-emerald-600" />
-            <span>IA Gen Activo</span>
+        <div className="flex items-center space-x-2 md:space-x-3 flex-wrap">
+          {/* Theme Toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className={`p-2 rounded-lg transition-all cursor-pointer active:scale-[0.90] border ${themeClasses.button.secondary}`}
+            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          >
+            {theme === 'dark' ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            )}
+          </button>
+          <div className="flex items-center space-x-2 text-sm">
+            <Sparkles size={16} className={theme === 'dark' ? 'text-[#00ff88]' : 'text-emerald-600'} />
+            <span className={themeClasses.text.secondary}>IA Gen Activo</span>
           </div>
-          <div className="h-6 w-px bg-slate-300 mx-2"></div>
+          <div className={`hidden md:block h-6 w-px mx-2 transition-colors ${theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-gray-300'}`}></div>
           <button 
             onClick={handlePrint}
-            className="flex items-center px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors shadow-sm font-medium"
+            className={`flex items-center px-3 md:px-4 py-2 rounded-lg transition-colors shadow-sm font-medium text-sm ${themeClasses.button.secondary}`}
           >
-            <Printer size={18} className="mr-2" />
-            Imprimir
+            <Printer size={18} className="mr-1 md:mr-2" />
+            <span className="hidden sm:inline">Imprimir</span>
           </button>
           <button 
             onClick={handleDownloadPDF}
             disabled={isGeneratingPDF}
-            className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-md font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`flex items-center px-3 md:px-4 py-2 rounded-lg transition-colors shadow-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed ${themeClasses.button.primary}`}
           >
             {isGeneratingPDF ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <div className={`animate-spin rounded-full h-4 w-4 border-b-2 mr-2 ${theme === 'dark' ? 'border-[#0a0a0a]' : 'border-white'}`}></div>
                 Generando...
               </>
             ) : (
@@ -538,24 +574,24 @@ const ReportsPage: React.FC = () => {
       </div>
 
       {/* Report Preview Canvas */}
-      <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-50">
+      <div className={`flex-1 overflow-y-auto p-4 md:p-8 flex justify-center transition-colors ${themeClasses.bg.secondary} min-h-0`}>
         {currentReport && (
-          <div ref={reportRef} className="bg-white w-full max-w-[210mm] shadow-xl p-12 text-slate-900 mb-8 print:shadow-none print:max-w-full print:p-8">
+          <div ref={reportRef} className={`${themeClasses.bg.card} w-full max-w-[210mm] shadow-xl p-6 md:p-12 mb-8 print:shadow-none print:max-w-full print:p-8 transition-colors ${themeClasses.text.primary}`}>
             {/* Watermark/Header */}
-            <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
+            <div className={`flex justify-between items-start border-b-2 pb-6 mb-8 transition-colors ${theme === 'dark' ? 'border-[#2a2a2a]' : 'border-gray-900'}`}>
               <div>
-                <h1 className="text-3xl font-bold text-slate-900 uppercase tracking-tight">Technical Due Diligence</h1>
-                <p className="text-emerald-600 font-semibold text-lg mt-1">Evaluación DNSH & Riesgos Climáticos</p>
-                <p className="text-sm text-slate-500 mt-2">
+                <h1 className={`text-3xl font-bold uppercase tracking-tight transition-colors ${themeClasses.text.primary}`}>Technical Due Diligence</h1>
+                <p className={`font-semibold text-lg mt-1 transition-colors ${theme === 'dark' ? 'text-[#00ff88]' : 'text-emerald-600'}`}>Evaluación DNSH & Riesgos Climáticos</p>
+                <p className={`text-sm mt-2 transition-colors ${themeClasses.text.tertiary}`}>
                   {reportLevel === ReportLevel.COMPANY && companyReport && `Nivel: Compañía - ${companyReport.clientName}`}
                   {reportLevel === ReportLevel.PORTFOLIO && portfolioReport && `Nivel: Portfolio - ${portfolioReport.operationName}`}
                   {reportLevel === ReportLevel.ASSET && assetReport && `Nivel: Asset - ${assetReport.assetName}`}
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-slate-900 text-lg">EcoInvest</p>
-                <p className="text-sm text-slate-500">Ref: {currentReport.reportDate.split('T')[0]}</p>
-                <p className="text-sm text-slate-500">{new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
+                <p className={`font-bold text-lg transition-colors ${themeClasses.text.primary}`}>EcoInvest</p>
+                <p className={`text-sm transition-colors ${themeClasses.text.tertiary}`}>Ref: {currentReport.reportDate.split('T')[0]}</p>
+                <p className={`text-sm transition-colors ${themeClasses.text.tertiary}`}>{new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
               </div>
             </div>
             
@@ -565,17 +601,17 @@ const ReportsPage: React.FC = () => {
                 const isExpanded = expandedSections.has(section.id);
                 return (
                   <section key={section.id} className="break-inside-avoid">
-                    <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm print:shadow-none">
+                    <div className={`${themeClasses.border.default} border rounded-lg overflow-hidden shadow-sm print:shadow-none transition-colors`}>
                       {/* Section Header */}
                       <div
-                        className={`p-4 cursor-pointer hover:bg-slate-50 transition-colors flex items-center justify-between print:cursor-default bg-white border-b border-slate-200`}
+                        className={`p-4 cursor-pointer transition-colors flex items-center justify-between print:cursor-default ${themeClasses.bg.card} ${themeClasses.border.default} border-b ${theme === 'dark' ? 'hover:bg-[#111111]' : 'hover:bg-gray-50'}`}
                         onClick={() => toggleSection(section.id)}
                       >
                         <div className="flex items-center space-x-3">
-                          <span className="text-sm font-bold text-slate-500">{idx + 1}.</span>
-                          <h2 className="text-lg font-bold text-slate-900">{section.title}</h2>
+                          <span className={`text-sm font-bold transition-colors ${themeClasses.text.tertiary}`}>{idx + 1}.</span>
+                          <h2 className={`text-lg font-bold transition-colors ${themeClasses.text.primary}`}>{section.title}</h2>
                           {section.metadata?.aiGenerated && (
-                            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded flex items-center space-x-1">
+                            <span className={`text-xs px-2 py-0.5 rounded flex items-center space-x-1 transition-colors ${themeClasses.badge.success}`}>
                               <Sparkles size={12} />
                               <span>IA Gen</span>
                             </span>
@@ -587,42 +623,42 @@ const ReportsPage: React.FC = () => {
                               e.stopPropagation();
                               setSelectedSection(section);
                             }}
-                            className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center space-x-1 px-2 py-1 hover:bg-emerald-50 rounded"
+                            className={`text-xs flex items-center space-x-1 px-2 py-1 rounded transition-colors ${theme === 'dark' ? 'text-[#00ff88] hover:text-white hover:bg-[#00ff88]/10' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}`}
                             title="Editar con IA"
                           >
                             <Edit3 size={14} />
                             <span>Editar</span>
                           </button>
                           <span className="print:hidden">
-                            {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            {isExpanded ? <ChevronUp size={20} className={themeClasses.text.secondary} /> : <ChevronDown size={20} className={themeClasses.text.secondary} />}
                           </span>
                         </div>
                       </div>
                       
                       {/* Section Content */}
                       {isExpanded && (
-                        <div className="p-6 bg-white">
-                          <div className="prose prose-sm max-w-none text-slate-700 whitespace-pre-wrap">
+                        <div className={`p-6 transition-colors ${themeClasses.bg.card}`}>
+                          <div className={`prose prose-sm max-w-none whitespace-pre-wrap transition-colors ${themeClasses.text.secondary}`}>
                             {section.content.split('\n').map((line, lineIdx) => {
                               if (line.startsWith('# ')) {
-                                return <h1 key={lineIdx} className="text-2xl font-bold mb-4">{line.substring(2)}</h1>;
+                                return <h1 key={lineIdx} className={`text-2xl font-bold mb-4 transition-colors ${themeClasses.text.primary}`}>{line.substring(2)}</h1>;
                               } else if (line.startsWith('## ')) {
-                                return <h2 key={lineIdx} className="text-xl font-bold mt-6 mb-3">{line.substring(3)}</h2>;
+                                return <h2 key={lineIdx} className={`text-xl font-bold mt-6 mb-3 transition-colors ${themeClasses.text.primary}`}>{line.substring(3)}</h2>;
                               } else if (line.startsWith('### ')) {
-                                return <h3 key={lineIdx} className="text-lg font-semibold mt-4 mb-2">{line.substring(4)}</h3>;
+                                return <h3 key={lineIdx} className={`text-lg font-semibold mt-4 mb-2 transition-colors ${themeClasses.text.primary}`}>{line.substring(4)}</h3>;
                               } else if (line.startsWith('- ')) {
-                                return <li key={lineIdx} className="ml-4 mb-1">{line.substring(2)}</li>;
+                                return <li key={lineIdx} className={`ml-4 mb-1 transition-colors ${themeClasses.text.secondary}`}>{line.substring(2)}</li>;
                               } else if (line.startsWith('**') && line.endsWith('**')) {
-                                return <p key={lineIdx} className="font-semibold mb-2">{line.replace(/\*\*/g, '')}</p>;
+                                return <p key={lineIdx} className={`font-semibold mb-2 transition-colors ${themeClasses.text.primary}`}>{line.replace(/\*\*/g, '')}</p>;
                               } else if (line.trim() === '') {
                                 return <br key={lineIdx} />;
                               } else {
-                                return <p key={lineIdx} className="mb-2">{line}</p>;
+                                return <p key={lineIdx} className={`mb-2 transition-colors ${themeClasses.text.secondary}`}>{line}</p>;
                               }
                             })}
                           </div>
                           {section.metadata?.lastModified && (
-                            <div className="mt-4 pt-4 border-t border-slate-200 text-xs text-slate-500">
+                            <div className={`mt-4 pt-4 border-t text-xs transition-colors ${themeClasses.border.default} ${themeClasses.text.tertiary}`}>
                               Última modificación: {new Date(section.metadata.lastModified).toLocaleString('es-ES')}
                               {section.metadata.modifiedBy && ` por ${section.metadata.modifiedBy}`}
                             </div>
@@ -639,38 +675,33 @@ const ReportsPage: React.FC = () => {
                 <>
                   {/* Asset Exposure Table */}
                   <section className="break-inside-avoid">
-                    <h2 className="text-sm font-bold uppercase text-slate-500 border-b border-slate-200 pb-1 mb-4">Análisis de Exposición de Activos</h2>
+                    <h2 className={`text-sm font-bold uppercase pb-1 mb-4 border-b transition-colors ${themeClasses.text.tertiary} ${themeClasses.border.default}`}>Análisis de Exposición de Activos</h2>
                     <table className="w-full text-sm border-collapse">
-                      <thead className="bg-slate-100 text-slate-700">
+                      <thead className={`transition-colors ${theme === 'dark' ? 'bg-[#111111]' : 'bg-gray-100'} ${themeClasses.text.secondary}`}>
                         <tr>
-                          <th className="py-3 px-4 text-left font-semibold border-b border-slate-300">Activo</th>
-                          <th className="py-3 px-4 text-left font-semibold border-b border-slate-300">Tipo</th>
-                          <th className="py-3 px-4 text-right font-semibold border-b border-slate-300">Valor (€)</th>
-                          <th className="py-3 px-4 text-center font-semibold border-b border-slate-300">Estado DNSH</th>
+                          <th className={`py-3 px-4 text-left font-semibold border-b transition-colors ${themeClasses.border.default}`}>Activo</th>
+                          <th className={`py-3 px-4 text-left font-semibold border-b transition-colors ${themeClasses.border.default}`}>Tipo</th>
+                          <th className={`py-3 px-4 text-right font-semibold border-b transition-colors ${themeClasses.border.default}`}>Valor (€)</th>
+                          <th className={`py-3 px-4 text-center font-semibold border-b transition-colors ${themeClasses.border.default}`}>Estado DNSH</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200">
+                      <tbody className={`divide-y transition-colors ${theme === 'dark' ? 'divide-[#1a1a1a]' : 'divide-gray-200'}`}>
                         {selectedOperation.assets.map(asset => (
-                          <tr key={asset.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => {
+                          <tr key={asset.id} className={`cursor-pointer transition-colors ${theme === 'dark' ? 'hover:bg-[#111111]' : 'hover:bg-gray-50'}`} onClick={() => {
                             setReportLevel(ReportLevel.ASSET);
                             setSelectedOpId(asset.operationId);
                             setSelectedAssetId(asset.id);
                           }}>
-                            <td className="py-3 px-4 font-medium text-slate-900">{asset.name}</td>
-                            <td className="py-3 px-4 text-slate-600">{asset.assetType}</td>
-                            <td className="py-3 px-4 text-right font-semibold text-slate-900">{(asset.exposedValue/1000000).toFixed(1)}M</td>
+                            <td className={`py-3 px-4 font-medium transition-colors ${themeClasses.text.primary}`}>{asset.name}</td>
+                            <td className={`py-3 px-4 transition-colors ${themeClasses.text.secondary}`}>{asset.assetType}</td>
+                            <td className={`py-3 px-4 text-right font-semibold transition-colors ${themeClasses.text.primary}`}>{(asset.exposedValue/1000000).toFixed(1)}M</td>
                             <td className="py-3 px-4 text-center">
                               {asset.dnshEvaluation ? (
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                                  asset.dnshEvaluation.overallStatus === 'Compliant' ? 'bg-emerald-100 text-emerald-700' :
-                                  asset.dnshEvaluation.overallStatus === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
-                                  asset.dnshEvaluation.overallStatus === 'Conditional' ? 'bg-amber-100 text-amber-700' :
-                                  'bg-slate-100 text-slate-700'
-                                }`}>
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition-colors ${getStatusBadgeClass(asset.dnshEvaluation.overallStatus)}`}>
                                   {asset.dnshEvaluation.overallStatus}
                                 </span>
                               ) : (
-                                <span className="text-slate-400 text-xs">No evaluado</span>
+                                <span className={`text-xs transition-colors ${themeClasses.text.tertiary}`}>No evaluado</span>
                               )}
                             </td>
                           </tr>
@@ -681,13 +712,13 @@ const ReportsPage: React.FC = () => {
                   
                   {/* Map Section */}
                   <section className="break-inside-avoid">
-                    <h2 className="text-sm font-bold uppercase text-slate-500 border-b border-slate-200 pb-1 mb-4">Ubicación Geográfica de Activos</h2>
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                      <div className="h-[250px] rounded-lg overflow-hidden border border-slate-300 relative">
+                    <h2 className={`text-sm font-bold uppercase pb-1 mb-4 border-b transition-colors ${themeClasses.text.tertiary} ${themeClasses.border.default}`}>Ubicación Geográfica de Activos</h2>
+                    <div className={`p-3 rounded-lg border transition-colors ${theme === 'dark' ? 'bg-[#0a0a0a]' : 'bg-gray-50'} ${themeClasses.border.default}`}>
+                      <div className={`h-[250px] rounded-lg overflow-hidden border relative transition-colors ${themeClasses.border.default}`}>
                         <MapViewer 
                           assets={selectedOperation.assets}
                           activeLayers={[]}
-                          theme="light"
+                          theme={theme}
                           showControls={true}
                         />
                       </div>
@@ -698,18 +729,18 @@ const ReportsPage: React.FC = () => {
             </div>
             
             {/* Footer */}
-            <div className="mt-8 pt-6 border-t-2 border-slate-300 text-xs text-slate-500 text-center print:mt-6">
-              <p className="font-medium mb-1">Este documento ha sido generado automáticamente por la plataforma EcoInvest DNSH.</p>
-              <p className="text-slate-400">La información contenida es confidencial y está sujeta a las políticas de privacidad de EcoInvest.</p>
+            <div className={`mt-8 pt-6 border-t-2 text-xs text-center print:mt-6 transition-colors ${theme === 'dark' ? 'border-[#2a2a2a]' : 'border-gray-300'} ${themeClasses.text.tertiary}`}>
+              <p className={`font-medium mb-1 transition-colors ${themeClasses.text.secondary}`}>Este documento ha sido generado automáticamente por la plataforma EcoInvest DNSH.</p>
+              <p className={`transition-colors ${themeClasses.text.muted}`}>La información contenida es confidencial y está sujeta a las políticas de privacidad de EcoInvest.</p>
             </div>
           </div>
         )}
         
         {!currentReport && (
-          <div className="bg-white rounded-lg p-12 text-center shadow-lg">
-            <FileText size={64} className="mx-auto mb-4 text-slate-300" />
-            <h3 className="text-xl font-semibold text-slate-700 mb-2">Selecciona un nivel y entidad para generar el reporte</h3>
-            <p className="text-slate-500">Usa los controles superiores para seleccionar Compañía, Portfolio o Asset</p>
+          <div className={`rounded-lg p-12 text-center shadow-lg transition-colors ${themeClasses.bg.card} ${themeClasses.border.default} border`}>
+            <FileText size={64} className={`mx-auto mb-4 transition-colors ${themeClasses.text.tertiary}`} />
+            <h3 className={`text-xl font-semibold mb-2 transition-colors ${themeClasses.text.primary}`}>Selecciona un nivel y entidad para generar el reporte</h3>
+            <p className={`transition-colors ${themeClasses.text.secondary}`}>Usa los controles superiores para seleccionar Compañía, Portfolio o Asset</p>
           </div>
         )}
       </div>

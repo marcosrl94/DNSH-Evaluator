@@ -208,9 +208,9 @@ const ReportingAIAssistant: React.FC<ReportingAIAssistantProps> = ({
 
       {/* Assistant Panel */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[600px] h-[700px] bg-white rounded-xl shadow-2xl flex flex-col border border-slate-200">
+        <div className="fixed inset-4 md:inset-auto md:bottom-6 md:right-6 md:w-[600px] md:h-[700px] md:max-w-[calc(100vw-2rem)] md:max-h-[calc(100vh-3rem)] z-50 bg-white rounded-xl shadow-2xl flex flex-col border border-slate-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 rounded-t-xl flex items-center justify-between">
+          <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 rounded-t-xl flex items-center justify-between flex-shrink-0">
             <div className="flex items-center space-x-3">
               <div className="bg-white/20 p-2 rounded-lg">
                 <Sparkles size={20} />
@@ -267,7 +267,7 @@ const ReportingAIAssistant: React.FC<ReportingAIAssistantProps> = ({
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
+          <div className="flex-1 overflow-y-auto p-4 bg-slate-50 min-h-0">
             {activeMode === 'edit' && (
               <div className="space-y-4">
                 {currentSection ? (

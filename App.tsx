@@ -10,6 +10,7 @@ import { AssetDnshEvaluation, Operation, DnshObjective } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
 import { logger } from './utils/logger';
 import { getAllOperations, dataStore, updateAssetEvaluation, updateOperation as updateOperationInStore } from './services/dataManagement';
+import PalantirLoader from './components/PalantirLoader';
 
 // Lazy load heavy components for better performance
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
@@ -39,7 +40,7 @@ type View = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail
 
 // Separate component for the authenticated layout to use the hook
 const AuthenticatedApp: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -57,16 +58,25 @@ const AuthenticatedApp: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // Security: Check if user has minimum permissions (after hooks)
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-black">
+        <PalantirLoader size="lg" text="INITIALIZING" />
+      </div>
+    );
+  }
+
+  // Security: Always show login page if not authenticated
   if (!user) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
-        <div className="text-center">
-          <Shield className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Authentication Required</h2>
-          <p className="text-slate-600">Please log in to continue.</p>
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-screen bg-black">
+          <PalantirLoader size="lg" text="LOADING" />
         </div>
-      </div>
+      }>
+        <LoginPage />
+      </Suspense>
     );
   }
 

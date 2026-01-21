@@ -525,8 +525,8 @@ const OperationDetailPage: React.FC<Props> = ({
 
                 {/* Evidence Panel Overlay (Slide-in from right) */}
                 {showEvidencePanel && (
-                  <div className="absolute top-0 right-0 bottom-0 w-96 bg-[#0a0a0a] shadow-2xl z-30 border-l border-[#1a1a1a] flex flex-col">
-                    <div className="p-4 border-b border-[#1a1a1a] bg-[#111111] flex items-center justify-between">
+                  <div className="absolute top-0 right-0 bottom-0 w-96 max-w-[calc(100vw-2rem)] bg-[#0a0a0a] shadow-2xl z-30 border-l border-[#1a1a1a] flex flex-col">
+                    <div className="p-4 border-b border-[#1a1a1a] bg-[#111111] flex items-center justify-between flex-shrink-0">
                       <h3 className="text-lg font-bold text-white font-mono uppercase tracking-wider">EVIDENCE</h3>
                       <button
                         type="button"
@@ -540,7 +540,7 @@ const OperationDetailPage: React.FC<Props> = ({
                         <X size={20} className="text-[#666666]" />
                       </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                       <EvidenceRegistry
                         operation={operation}
                         onAddEvidence={handleAddEvidence}
