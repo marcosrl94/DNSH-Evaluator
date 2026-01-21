@@ -319,25 +319,18 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
             </button>
             
             {/* View Mode Toggle */}
-            <div className={`flex items-center space-x-2 rounded-lg p-1 border transition-colors relative z-10 ${
-              theme === 'dark' ? 'bg-[#111111] border-[#1a1a1a]' : 'bg-gray-100 border-gray-200'
-            }`} style={{ pointerEvents: 'auto' }}>
+            <div className={`flex items-center space-x-2 rounded-lg p-1 border transition-colors relative z-10 ${themeClasses.bg.tertiary} ${themeClasses.border.default}`} style={{ pointerEvents: 'auto' }}>
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('LIST button clicked, current viewMode:', viewMode);
                   setViewMode('list');
                 }}
                 className={`px-4 py-2 rounded text-xs font-mono uppercase tracking-wider transition-all cursor-pointer active:scale-[0.95] relative z-10 ${
                   viewMode === 'list'
-                    ? theme === 'dark'
-                      ? 'bg-[#00ff88] text-[#0a0a0a] shadow-lg shadow-[#00ff88]/20'
-                      : 'bg-[#0066cc] text-white shadow-lg shadow-[#0066cc]/20'
-                    : theme === 'dark'
-                      ? 'text-[#666666] hover:text-white hover:bg-[#0a0a0a]'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    ? themeClasses.button.primary
+                    : themeClasses.button.ghost
                 }`}
                 style={{ pointerEvents: 'auto' }}
               >
@@ -349,17 +342,12 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('MAP button clicked, current viewMode:', viewMode);
                   setViewMode('map');
                 }}
                 className={`px-4 py-2 rounded text-xs font-mono uppercase tracking-wider transition-all cursor-pointer active:scale-[0.95] relative z-10 ${
                   viewMode === 'map'
-                    ? theme === 'dark'
-                      ? 'bg-[#00ff88] text-[#0a0a0a] shadow-lg shadow-[#00ff88]/20'
-                      : 'bg-[#0066cc] text-white shadow-lg shadow-[#0066cc]/20'
-                    : theme === 'dark'
-                      ? 'text-[#666666] hover:text-white hover:bg-[#0a0a0a]'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    ? themeClasses.button.primary
+                    : themeClasses.button.ghost
                 }`}
                 style={{ pointerEvents: 'auto' }}
               >

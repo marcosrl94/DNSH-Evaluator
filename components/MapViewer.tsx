@@ -566,10 +566,16 @@ const MapViewer: React.FC<MapViewerProps> = ({
 
       {/* Loading State */}
       {!isMapReady && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+        <div className={`absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm transition-colors ${
+          isDark ? 'bg-black/50' : 'bg-white/50'
+        }`}>
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-            <p className="text-sm text-slate-300 font-medium">Cargando mapa...</p>
+            <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 transition-colors ${
+              isDark ? 'border-[#00ff88]' : 'border-[#0066cc]'
+            }`}></div>
+            <p className={`text-sm font-medium transition-colors ${
+              isDark ? 'text-[#c0c0c0]' : 'text-gray-700'
+            }`}>Cargando mapa...</p>
           </div>
         </div>
       )}
@@ -614,11 +620,25 @@ const MapViewer: React.FC<MapViewerProps> = ({
       
       {/* Status bar */}
       {statusMeta && (
-        <div className="absolute left-3 bottom-3 z-[1000] bg-slate-900/80 backdrop-blur-sm text-slate-100 border border-slate-700/60 rounded-xl px-3 py-2 shadow-lg flex flex-col gap-1 text-xs">
-          {statusMeta.title && <span className="font-semibold text-[11px] text-white">{statusMeta.title}</span>}
+        <div className={`absolute left-3 bottom-3 z-[1000] backdrop-blur-sm border rounded-xl px-3 py-2 shadow-lg flex flex-col gap-1 text-xs transition-colors ${
+          isDark 
+            ? 'bg-[#0a0a0a]/80 text-[#c0c0c0] border-[#1a1a1a]' 
+            : 'bg-white/80 text-gray-700 border-gray-200'
+        }`}>
+          {statusMeta.title && <span className={`font-semibold text-[11px] transition-colors ${
+            isDark ? 'text-white' : 'text-gray-900'
+          }`}>{statusMeta.title}</span>}
           <div className="flex items-center gap-3">
-            <span className="text-slate-200">Assets: <span className="font-semibold">{validAssets.length}</span></span>
-            <span className="text-slate-200">Layers: <span className="font-semibold">{activeLayers.length}</span></span>
+            <span className={`transition-colors ${
+              isDark ? 'text-[#c0c0c0]' : 'text-gray-600'
+            }`}>Assets: <span className={`font-semibold transition-colors ${
+              isDark ? 'text-white' : 'text-gray-900'
+            }`}>{validAssets.length}</span></span>
+            <span className={`transition-colors ${
+              isDark ? 'text-[#c0c0c0]' : 'text-gray-600'
+            }`}>Layers: <span className={`font-semibold transition-colors ${
+              isDark ? 'text-white' : 'text-gray-900'
+            }`}>{activeLayers.length}</span></span>
           </div>
           {(statusMeta.scenario || statusMeta.horizon) && (
             <div className="flex items-center gap-2">
