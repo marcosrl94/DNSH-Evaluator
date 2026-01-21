@@ -20,13 +20,13 @@ Esta aplicación puede desplegarse en varias plataformas. Aquí tienes las opcio
    - Conecta tu repositorio de GitHub
    - Selecciona este proyecto
    - Vercel detectará automáticamente que es un proyecto Vite
-   - Agrega la variable de entorno `GEMINI_API_KEY` en la configuración del proyecto
+   - (Opcional) Agrega la variable de entorno `GEMINI_API_KEY` si quieres usar IA real
    - ¡Listo! Se desplegará automáticamente en cada push a `main`
 
-3. **Configurar variables de entorno**:
+3. **(Opcional) Configurar variables de entorno**:
    - Ve a tu proyecto en Vercel Dashboard
    - Settings → Environment Variables
-   - Agrega: `GEMINI_API_KEY` con tu clave
+   - Agrega: `GEMINI_API_KEY` con tu clave (solo si quieres usar IA real)
 
 **Ventajas:**
 - ✅ Despliegue automático en cada push
@@ -44,9 +44,10 @@ Esta aplicación puede desplegarse en varias plataformas. Aquí tienes las opcio
    - Ve a Settings → Pages
    - Source: GitHub Actions
 
-2. **Configura el secreto**:
+2. **(Opcional) Configura el secreto** si quieres usar IA real:
    - Ve a Settings → Secrets and variables → Actions
    - Agrega un nuevo secreto: `GEMINI_API_KEY` con tu clave
+   - **Nota:** No es necesario, la app funciona sin él
 
 3. **Haz push de los cambios**:
    ```bash
@@ -71,7 +72,7 @@ Esta aplicación puede desplegarse en varias plataformas. Aquí tienes las opcio
 3. Configuración de build:
    - Build command: `npm run build`
    - Publish directory: `dist`
-4. Agrega variable de entorno: `GEMINI_API_KEY`
+4. (Opcional) Agrega variable de entorno: `GEMINI_API_KEY` si quieres usar IA real
 5. Deploy!
 
 ---
@@ -86,16 +87,18 @@ Esta aplicación puede desplegarse en varias plataformas. Aquí tienes las opcio
    - Framework preset: Vite
    - Build command: `npm run build`
    - Build output directory: `dist`
-4. Agrega variable de entorno: `GEMINI_API_KEY`
+4. (Opcional) Agrega variable de entorno: `GEMINI_API_KEY` si quieres usar IA real
 5. Deploy!
 
 ---
 
-## 📝 Variables de Entorno Necesarias
+## 📝 Variables de Entorno (Opcional)
 
-Todas las plataformas necesitan esta variable:
+La aplicación funciona sin variables de entorno. Si quieres usar la funcionalidad de IA con Gemini, puedes agregar:
 
-- `GEMINI_API_KEY`: Tu clave de API de Google Gemini
+- `GEMINI_API_KEY`: Tu clave de API de Google Gemini (opcional)
+
+**Nota:** La aplicación funciona perfectamente sin esta clave usando respuestas simuladas.
 
 ---
 
@@ -103,5 +106,5 @@ Todas las plataformas necesitan esta variable:
 
 **Vercel** es la opción más fácil y rápida para este tipo de proyectos. Solo necesitas:
 1. Conectar tu repositorio
-2. Agregar la variable de entorno
+2. (Opcional) Agregar la variable de entorno si quieres usar IA real
 3. ¡Listo! Se despliega automáticamente
