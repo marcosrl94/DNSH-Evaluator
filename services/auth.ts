@@ -359,7 +359,7 @@ export const register = async (data: RegisterData): Promise<User> => {
         );
       }
     } catch (err) {
-      console.error('Error checking registered users:', err);
+      // Silently handle - registration check errors shouldn't break the app
     }
   }
   
@@ -395,7 +395,7 @@ export const register = async (data: RegisterData): Promise<User> => {
     });
     localStorage.setItem('ecoinvest_registered_users', JSON.stringify(registeredUsers));
   } catch (err) {
-    console.error('Error storing registered user:', err);
+    // Silently handle - registration storage errors shouldn't break the app
   }
 
   // Return user without password
@@ -429,7 +429,7 @@ export const login = async (email: string, password: string): Promise<User> => {
         }
       }
     } catch (err) {
-      console.error('Error loading registered users:', err);
+      // Silently handle - user loading errors shouldn't break the app
     }
   }
   

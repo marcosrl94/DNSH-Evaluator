@@ -297,11 +297,7 @@ const OperationDetailPage: React.FC<Props> = ({
                   OBJETIVOS_DNSH
                 </h4>
                 <div className="space-y-1.5">
-                  {(() => {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/3643d2bc-84c4-48ef-965a-acea6e50f48b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:297',message:'Rendering DNSH objectives',data:{templatesCount:DNSH_CHECKLIST_TEMPLATES.length,hasOnNavigateToDnshObjective:!!onNavigateToDnshObjective,hasOnNavigateToDnshEvaluation:!!onNavigateToDnshEvaluation},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                    // #endregion
-                    return DNSH_CHECKLIST_TEMPLATES.map((template) => {
+                  {DNSH_CHECKLIST_TEMPLATES.map((template) => {
                       const objective = template.objective;
                       const status = getObjectiveStatus(objective);
                       const color = getObjectiveColor(objective);
@@ -314,27 +310,24 @@ const OperationDetailPage: React.FC<Props> = ({
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            // #region agent log
-                            fetch('http://127.0.0.1:7242/ingest/3643d2bc-84c4-48ef-965a-acea6e50f48b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:306',message:'Objective button clicked',data:{objective,hasOnNavigateToDnshObjective:!!onNavigateToDnshObjective},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                            // #endregion
                             if (onNavigateToDnshObjective) {
                               onNavigateToDnshObjective(objective);
                             } else {
                               onNavigateToDnshEvaluation();
                             }
                           }}
-                        className={`w-full text-left p-2 rounded border transition-all cursor-pointer active:scale-[0.98] ${
-                          isSubstantial 
-                            ? (color === 'emerald' ? 'bg-[#00ff88]/10 border-[#00ff88]/30 hover:bg-[#00ff88]/15 hover:shadow-lg hover:shadow-[#00ff88]/10' :
-                               color === 'amber' ? 'bg-[#ffb800]/10 border-[#ffb800]/30 hover:bg-[#ffb800]/15 hover:shadow-lg hover:shadow-[#ffb800]/10' :
-                               color === 'blue' ? 'bg-[#00a8ff]/10 border-[#00a8ff]/30 hover:bg-[#00a8ff]/15 hover:shadow-lg hover:shadow-[#00a8ff]/10' :
-                               color === 'purple' ? 'bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/15 hover:shadow-lg hover:shadow-purple-500/10' :
-                               color === 'red' ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/15 hover:shadow-lg hover:shadow-red-500/10' :
-                               color === 'green' ? 'bg-[#00ff88]/10 border-[#00ff88]/30 hover:bg-[#00ff88]/15 hover:shadow-lg hover:shadow-[#00ff88]/10' :
-                               'bg-[#0a0a0a] border-[#1a1a1a] hover:bg-[#111111]')
-                            : 'bg-[#0a0a0a] border-[#1a1a1a] hover:border-[#00ff88]/20 hover:bg-[#111111] active:bg-[#0a0a0a]'
-                        }`}
-                      >
+                          className={`w-full text-left p-2 rounded border transition-all cursor-pointer active:scale-[0.98] ${
+                            isSubstantial 
+                              ? (color === 'emerald' ? 'bg-[#00ff88]/10 border-[#00ff88]/30 hover:bg-[#00ff88]/15 hover:shadow-lg hover:shadow-[#00ff88]/10' :
+                                 color === 'amber' ? 'bg-[#ffb800]/10 border-[#ffb800]/30 hover:bg-[#ffb800]/15 hover:shadow-lg hover:shadow-[#ffb800]/10' :
+                                 color === 'blue' ? 'bg-[#00a8ff]/10 border-[#00a8ff]/30 hover:bg-[#00a8ff]/15 hover:shadow-lg hover:shadow-[#00a8ff]/10' :
+                                 color === 'purple' ? 'bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/15 hover:shadow-lg hover:shadow-purple-500/10' :
+                                 color === 'red' ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/15 hover:shadow-lg hover:shadow-red-500/10' :
+                                 color === 'green' ? 'bg-[#00ff88]/10 border-[#00ff88]/30 hover:bg-[#00ff88]/15 hover:shadow-lg hover:shadow-[#00ff88]/10' :
+                                 'bg-[#0a0a0a] border-[#1a1a1a] hover:bg-[#111111]')
+                              : 'bg-[#0a0a0a] border-[#1a1a1a] hover:border-[#00ff88]/20 hover:bg-[#111111] active:bg-[#0a0a0a]'
+                          }`}
+                        >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2 flex-1 min-w-0">
                             {getObjectiveIcon(objective)}
@@ -378,8 +371,7 @@ const OperationDetailPage: React.FC<Props> = ({
                         </div>
                       </button>
                     );
-                  });
-                  })()}
+                  })}
                 </div>
                 <button
                   type="button"

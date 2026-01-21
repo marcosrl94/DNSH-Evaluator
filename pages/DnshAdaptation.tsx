@@ -364,35 +364,105 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
           </div>
       );
 
+      // Get scope status for all hazards for this asset
+      const hazardScopeStatus = useMemo(() => {
+        const status: Record<string, 'In Scope' | 'Out of Scope' | 'Not Set'> = {};
+        if (selectedAsset) {
+          EU_TAXONOMY_HAZARDS.forEach(hazard => {
+            const scope = selectedAsset.attributes.adaptationHazardScope?.[hazard.id];
+            status[hazard.id] = scope === 'In Scope' ? 'In Scope' : scope === 'Out of Scope' ? 'Out of Scope' : 'Not Set';
+          });
+        }
+        return status;
+      }, [selectedAsset]);
+
       return (
         <div className="space-y-6 animate-fadeIn">
-            {/* Step 3: Materiality Assessment (H+E+V) */}
-            <div className="bg-[#0a0a0a] p-6 rounded-xl border border-[#1a1a1a] transition-all">
-                <div className="flex justify-between items-start mb-4">
-                    <h4 className="text-lg font-bold text-white flex items-center font-mono uppercase tracking-wider">
-                        <Sliders size={20} className="mr-2 text-[#00a8ff]" />
-                        MATERIALITY_ASSESSMENT: {selectedHazard.name.replace(/\s/g, '_')}
-                    </h4>
-                    <div className="text-xs text-right text-[#666666] font-mono uppercase tracking-wider">
-                     <p>SCENARIO: <span className="font-semibold text-white">{selectedScenarioConfig?.label || selectedScenario}</span></p>
-                        <p>HORIZON: <span className="font-semibold text-white">{selectedHorizon}</span></p>
-                     {selectedScenarioConfig && selectedHazard.scenarioProjections?.[selectedScenario] && (
-                       <p className="text-[10px] mt-1">
-                         Intensity {selectedHorizon}: {((selectedHazard.scenarioProjections[selectedScenario]?.[selectedHorizon === '2030' ? 'intensity2050' : selectedHorizon === '2050' ? 'intensity2050' : 'intensity2100'] || 0) * 100).toFixed(0)}%
-                       </p>
-                     )}
+            {/* Two Column Layout: Materiality Assessment (Left) + Adaptation Details (Right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* LEFT: Materiality Assessment */}
+                <div className={`p-6 rounded-xl border transition-all flex flex-col ${themeClasses.bg.secondary} ${themeClasses.border.default}`}>
+                    <div className="flex justify-between items-start mb-4 flex-shrink-0">
+                        <h4 className={`text-lg font-bold flex items-center font-mono uppercase tracking-wider ${themeClasses.text.primary}`}>
+                            <Sliders size={20} className="mr-2 text-[#00a8ff]" />
+                            MATERIALITY_ASSESSMENT
+                        </h4>
+                        <div className={`text-xs text-right font-mono uppercase tracking-wider ${themeClasses.text.tertiary}`}>
+                         <p>SCENARIO: <span className={`font-semibold ${themeClasses.text.primary}`}>{selectedScenarioConfig?.label || selectedScenario}</span></p>
+                            <p>HORIZON: <span className={`font-semibold ${themeClasses.text.primary}`}>{selectedHorizon}</span></p>
+                        </div>
                     </div>
-                </div>
+
+                    {/* Scope In/Out Hazards Display */}
+                    <div className="mb-4 flex-shrink-0">
+                        <h5 className={`text-sm font-bold mb-3 flex items-center font-mono uppercase tracking-wider ${themeClasses.text.primary}`}>
+                            <Activity size={14} className="mr-2 text-[#00a8ff]" />
+                            HAZARD_SCOPE_ASSESSMENT
+                        </h5>
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* In Scope Hazards */}
+                            <div className="bg-[#00ff88]/10 border border-[#00ff88]/30 rounded-lg p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold text-[#00ff88] font-mono uppercase">IN_SCOPE</span>
+                                    <span className={`text-xs font-bold font-mono ${themeClasses.text.primary}`}>
+                                        {Object.values(hazardScopeStatus).filter(s => s === 'In Scope').length}
+                                    </span>
+                                </div>
+                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                    {EU_TAXONOMY_HAZARDS
+                                        .filter(h => hazardScopeStatus[h.id] === 'In Scope')
+                                        .map(hazard => (
+                                            <div key={hazard.id} className={`flex items-center space-x-2 text-[10px] font-mono uppercase`}>
+                                                <div className="w-2 h-2 rounded-full bg-[#00ff88] flex-shrink-0"></div>
+                                                <span className={`truncate ${themeClasses.text.primary}`}>{hazard.name.replace(/\s/g, '_')}</span>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                            {/* Out of Scope Hazards */}
+                            <div className="bg-[#666666]/20 border border-[#666666]/30 rounded-lg p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold text-[#666666] font-mono uppercase">OUT_OF_SCOPE</span>
+                                    <span className={`text-xs font-bold font-mono ${themeClasses.text.primary}`}>
+                                        {Object.values(hazardScopeStatus).filter(s => s === 'Out of Scope').length}
+                                    </span>
+                                </div>
+                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                    {EU_TAXONOMY_HAZARDS
+                                        .filter(h => hazardScopeStatus[h.id] === 'Out of Scope')
+                                        .map(hazard => (
+                                            <div key={hazard.id} className={`flex items-center space-x-2 text-[10px] font-mono uppercase`}>
+                                                <div className="w-2 h-2 rounded-full bg-[#666666] flex-shrink-0"></div>
+                                                <span className={`truncate ${themeClasses.text.tertiary}`}>{hazard.name.replace(/\s/g, '_')}</span>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Map - Only in Materiality Assessment */}
+                    <div className="mb-6 flex-1 min-h-0" style={{ minHeight: '400px', maxHeight: '500px' }}>
+                        <div className={`h-full rounded-lg border overflow-hidden ${themeClasses.border.default} ${themeClasses.bg.tertiary}`}>
+                            <MapViewer 
+                                assets={assetsToEvaluate} 
+                                activeLayers={activeMapLayers} 
+                                showControls 
+                                statusMeta={{ 
+                                    title: `${operation.name} - ${selectedAsset?.name || 'Portfolio'}`,
+                                    scenario: selectedScenario,
+                                    horizon: selectedHorizon
+                                }}
+                            />
+                        </div>
+                    </div>
                 
                 {/* Metrics Comparison Across Scenarios */}
                 {(() => {
                   const comparison = getHazardMetricsComparison(selectedHazard, selectedHorizon);
-                  const currentMetrics = selectedHorizon === '2030' ? selectedScenarioConfig?.metrics2030 :
-                                        selectedHorizon === '2050' ? selectedScenarioConfig?.metrics2050 :
-                                        selectedScenarioConfig?.metrics2100;
                   
                   return (
-                    <div className="mb-6 bg-[#111111] rounded-lg p-4 border border-[#1a1a1a]">
+                    <div className="mb-6 bg-[#111111] rounded-lg p-4 border border-[#1a1a1a] flex-shrink-0">
                       <h5 className="text-sm font-bold text-white mb-3 flex items-center font-mono uppercase tracking-wider">
                         <Activity size={14} className="mr-2 text-[#00a8ff]" />
                         COMPARACION_METRICAS_POR_ESCENARIO ({selectedHorizon})
@@ -494,13 +564,13 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
                   );
                 })()}
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <ScoreCard label="Hazard (H)" score={selectedAssessment.scoreHazard} description="Climate projection intensity" color="blue" />
-                    <ScoreCard label="Exposure (E)" score={selectedAssessment.scoreExposure} description="Asset location sensitivity" color="indigo" />
-                    <ScoreCard label="Vulnerability (V)" score={selectedAssessment.scoreVulnerability} description="Asset susceptibility" color="purple" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 flex-shrink-0">
+                    <ScoreCard label="Hazard (H)" score={selectedAssessment.scoreHazard} description="Climate projection intensity" color="blue" themeClasses={themeClasses} />
+                    <ScoreCard label="Exposure (E)" score={selectedAssessment.scoreExposure} description="Asset location sensitivity" color="indigo" themeClasses={themeClasses} />
+                    <ScoreCard label="Vulnerability (V)" score={selectedAssessment.scoreVulnerability} description="Asset susceptibility" color="purple" themeClasses={themeClasses} />
                 </div>
 
-                <div className="flex items-center justify-between bg-[#111111] p-4 rounded-lg border border-[#1a1a1a]">
+                <div className="flex items-center justify-between bg-[#111111] p-4 rounded-lg border border-[#1a1a1a] flex-shrink-0">
                     <div>
                         <p className="text-sm font-semibold text-[#666666] font-mono uppercase tracking-wider">TOTAL_RISK_SCORE_H+E+V</p>
                         <div className="flex items-baseline space-x-2">
@@ -523,12 +593,18 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
 
             </div>
 
-            {/* Step 4: DNSH Diagnosis Pre/Post Measures */}
-                 <div className="bg-[#0a0a0a] p-6 rounded-xl border border-[#1a1a1a]">
-                <h4 className="text-lg font-bold text-white mb-6 flex items-center font-mono uppercase tracking-wider">
-                        <Activity size={20} className="mr-2 text-[#00ff88]" />
-                    DIAGNOSTICO_DNSH_PRE_POST_MEDIDAS_ADAPTACION
-                    </h4>
+                {/* RIGHT: Adaptation Details - Only measures for scope in hazards */}
+                <div className={`p-6 rounded-xl border transition-all flex flex-col overflow-hidden ${themeClasses.bg.secondary} ${themeClasses.border.default}`}>
+                    <div className="flex justify-between items-start mb-4 flex-shrink-0">
+                        <h4 className={`text-lg font-bold flex items-center font-mono uppercase tracking-wider ${themeClasses.text.primary}`}>
+                            <Activity size={20} className="mr-2 text-[#00ff88]" />
+                            ADAPTATION_DETAILS
+                        </h4>
+                    </div>
+                    
+                    {/* Show only if hazard is in scope */}
+                    {hazardScopeStatus[selectedHazard.id] === 'In Scope' ? (
+                        <div className="flex-1 overflow-y-auto min-h-0">
                 
                 {/* Pre-Measures Diagnosis */}
                 <div className="mb-6">
@@ -1088,20 +1164,35 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
                     );
                 })()}
 
-                {/* No Measures Required */}
-                {!selectedAssessment.measuresRequired && (
-                <div className="bg-green-50 p-6 rounded-xl border border-green-100 flex items-center space-x-4">
-                    <CheckCircleIcon />
-                    <div>
-                            <h4 className="font-bold text-green-900">DNSH Compliance Cumplido</h4>
-                            <p className="text-sm text-green-700">
-                                El riesgo ({selectedAssessment.riskBand}) es aceptable para este escenario. 
-                                No se requieren medidas estructurales de adaptación. Estado DNSH: <span className="font-bold">{calculateDnshStatus(selectedAssessment.riskBand)}</span>
-                            </p>
+                            {/* No Measures Required */}
+                            {!selectedAssessment.measuresRequired && (
+                            <div className="bg-[#00ff88]/10 p-6 rounded-xl border border-[#00ff88]/30 flex items-center space-x-4">
+                                <CheckCircleIcon />
+                                <div>
+                                    <h4 className="font-bold text-[#00ff88] font-mono uppercase tracking-wider">DNSH_COMPLIANCE_CUMPLIDO</h4>
+                                    <p className="text-sm text-white font-mono uppercase">
+                                        EL_RIESGO ({selectedAssessment.riskBand.replace(/\s/g, '_')}) ES_ACEPTABLE_PARA_ESTE_ESCENARIO. 
+                                        NO_SE_REQUIEREN_MEDIDAS_ESTRUCTURALES_DE_ADAPTACION. ESTADO_DNSH: <span className="font-bold">{calculateDnshStatus(selectedAssessment.riskBand).replace(/\s/g, '_')}</span>
+                                    </p>
+                                </div>
+                            </div>
+                            )}
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        <div className="flex-1 flex items-center justify-center p-6">
+                            <div className="text-center">
+                                <AlertTriangle size={48} className={`mx-auto mb-4 ${themeClasses.text.tertiary}`} />
+                                <p className={`text-sm font-bold font-mono uppercase tracking-wider mb-2 ${themeClasses.text.tertiary}`}>
+                                    HAZARD_FUERA_DE_SCOPE
+                                </p>
+                                <p className={`text-xs font-mono uppercase ${themeClasses.text.tertiary}`}>
+                                    ESTE_HAZARD_NO_REQUIERE_MEDIDAS_DE_ADAPTACION_SEGUN_LAS_CARACTERISTICAS_DEL_ASSET.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
+            </div>
         </div>
       );
   }
@@ -1614,13 +1705,22 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
   );
 };
 
-const ScoreCard = ({ label, score, description, color }: any) => {
+interface ScoreCardProps {
+  label: string;
+  score: number;
+  description?: string;
+  color?: 'blue' | 'indigo' | 'purple';
+  themeClasses?: ReturnType<typeof getThemeClasses>;
+}
+
+const ScoreCard = ({ label, score, description, color = 'blue', themeClasses }: ScoreCardProps) => {
     const colorMap: Record<string, { bg: string; text: string; border: string; progress: string }> = {
         blue: { bg: 'bg-[#00a8ff]/10', text: 'text-[#00a8ff]', border: 'border-[#00a8ff]/30', progress: 'bg-[#00a8ff]' },
         indigo: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', progress: 'bg-purple-500' },
         purple: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', progress: 'bg-purple-500' },
     };
     const colors = colorMap[color] || { bg: 'bg-[#00a8ff]/10', text: 'text-[#00a8ff]', border: 'border-[#00a8ff]/30', progress: 'bg-[#00a8ff]' };
+    const bgTertiary = themeClasses?.bg.tertiary || 'bg-[#1a1a1a]';
     
     return (
         <div className={`p-4 rounded-lg ${colors.bg} border ${colors.border}`}>
@@ -1628,10 +1728,12 @@ const ScoreCard = ({ label, score, description, color }: any) => {
                 <span className={`text-sm font-bold ${colors.text} font-mono uppercase tracking-wider`}>{label.replace(/\s/g, '_')}</span>
                 <span className={`text-xl font-bold ${colors.text} font-mono`}>{score}</span>
         </div>
-            <div className="w-full bg-[#1a1a1a] rounded-full h-2 mb-2">
+            <div className={`w-full rounded-full h-2 mb-2 ${bgTertiary}`}>
                 <div className={`${colors.progress} h-2 rounded-full transition-all duration-500 ease-out`} style={{ width: `${(score/5)*100}%` }}></div>
         </div>
-            <p className={`text-xs ${colors.text} font-mono uppercase tracking-wider`}>{description.replace(/\s/g, '_')}</p>
+            {description && (
+                <p className={`text-xs ${colors.text} font-mono uppercase tracking-wider`}>{description.replace(/\s/g, '_')}</p>
+            )}
     </div>
 );
 };

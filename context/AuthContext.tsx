@@ -102,7 +102,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
       } catch (err) {
-        console.error('Error loading stored user:', err);
+        // Silently handle - session loading errors shouldn't break the app
         localStorage.removeItem('ecoinvest_user');
         localStorage.removeItem('ecoinvest_keep_signed_in');
         localStorage.removeItem('ecoinvest_session_expiry');

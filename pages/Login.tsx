@@ -676,9 +676,9 @@ const LoginPage: React.FC = () => {
                       setTimeout(() => {
                         setLoginSuccess(false);
                       }, 2000);
-                    } catch (err: any) {
+                    } catch (err) {
                       // Error is handled in context
-                      console.error('Google login error:', err);
+                      // Silently handle - error state is managed by AuthContext
                     }
                   }}
                   disabled={isLoading}

@@ -17,9 +17,6 @@ interface Props {
 }
 
 const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperation }) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3643d2bc-84c4-48ef-965a-acea6e50f48b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DnshEvaluation.tsx:18',message:'DnshEvaluationPage mounted',data:{operationId:operation.id,assetsCount:operation.assets.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   
   // State declarations (must be before useEffect hooks)
   const [activeObjective, setActiveObjective] = useState<DnshObjective>(DnshObjective.MITIGATION);
