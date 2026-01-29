@@ -12,7 +12,7 @@ COPY package*.json ./
 COPY tsconfig.json ./
 
 # Instalar TODAS las dependencias (incluyendo devDependencies para TypeScript)
-RUN npm ci && npm cache clean --force
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 # Copiar código fuente
 COPY . .
@@ -27,7 +27,7 @@ WORKDIR /app
 
 # Instalar solo dependencias de producción
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
 
 # Copiar código compilado desde builder
 COPY --from=builder /app/dist ./dist
