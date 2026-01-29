@@ -149,7 +149,11 @@ const ReportingAIAssistant: React.FC<ReportingAIAssistantProps> = ({
         objective,
         status,
         context.evidenceDocuments || [],
-        context
+        {
+          asset: context.asset,
+          operation: context.operation,
+          client: context.client
+        }
       );
       
       setEditingContent(justification);

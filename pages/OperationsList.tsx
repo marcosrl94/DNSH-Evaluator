@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Filter, Plus, ArrowRight, CheckCircle, XCircle, AlertTriangle, HelpCircle, Building2, Users } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Filter, Plus, ArrowRight, CheckCircle, XCircle, AlertTriangle, HelpCircle, Building2, Users, Archive, X } from 'lucide-react';
 import { DEMO_OPERATIONS, DEMO_CLIENTS } from '../constants';
 import { Operation, AssetDnshEvaluation, Client } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
-import { getAllOperations, dataStore, getClientOperations } from '../services/dataManagement';
+import { getActiveOperations, dataStore, getClientOperations, archiveOperation, deleteOperation } from '../services/dataManagement';
+import { useAuth } from '../context/AuthContext';
+import { logger } from '../utils/logger';
 
 interface Props {
   onNavigateToOperation: (id: string) => void;
@@ -98,33 +100,111 @@ const calculateOperationDnshStatus = (operation: Operation): {
 const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedClientId, onNavigateToClient }) => {
   const { theme } = useTheme();
   const themeClasses = getThemeClasses(theme);
+  const { user } = useAuth();
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showClients, setShowClients] = useState(!selectedClientId); // Show clients if none selected
-  const [operations, setOperations] = useState<Operation[]>(getAllOperations());
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Load active operations on mount (exclude archived)
+  useEffect(() => {
+    const loadOperations = async () => {
+      try {
+        const ops = await getActiveOperations();
+        setOperations(Array.isArray(ops) ? ops : []);
+      } catch (error) {
+        logger.error('Error loading operations:', error);
+        setOperations([]);
+      }
+    };
+    loadOperations();
+  }, []);
 
   // Subscribe to data store changes
-  React.useEffect(() => {
-    const unsubscribe = dataStore.subscribe(() => {
-      setOperations(getAllOperations());
+  useEffect(() => {
+    const unsubscribe = dataStore.subscribe(async () => {
+      try {
+        const ops = await getActiveOperations();
+        setOperations(Array.isArray(ops) ? ops : []);
+      } catch (error) {
+        logger.error('Error loading operations:', error);
+      }
     });
     return unsubscribe;
   }, []);
 
+  const handleArchiveOperation = async (operationId: string) => {
+    if (!user) {
+      alert('Debe estar autenticado para archivar operaciones');
+      return;
+    }
+    
+    if (!window.confirm('¿Está seguro de que desea archivar esta operación? Se moverá al historial.')) {
+      return;
+    }
+    
+    setArchivingId(operationId);
+    try {
+      await archiveOperation(operationId, user.name || user.email || 'System');
+      // Force refresh operations
+      const ops = await getActiveOperations();
+      setOperations(Array.isArray(ops) ? ops : []);
+    } catch (error: any) {
+      logger.error('Error archiving operation:', error);
+      alert(`Error al archivar la operación: ${error.message || 'Por favor, intente nuevamente.'}`);
+    } finally {
+      setArchivingId(null);
+    }
+  };
+
+  const handleDeleteOperation = async (operationId: string) => {
+    if (!user) {
+      alert('Debe estar autenticado para eliminar operaciones');
+      return;
+    }
+
+    const operation = operations.find(op => op.id === operationId);
+    if (!operation) return;
+
+    if (!window.confirm(`¿Está seguro de que desea eliminar la operación "${operation.name}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    setDeletingId(operationId);
+    try {
+      await deleteOperation(operationId);
+      // Force refresh operations
+      const ops = await getActiveOperations();
+      setOperations(Array.isArray(ops) ? ops : []);
+    } catch (error: any) {
+      logger.error('Error deleting operation:', error);
+      alert(`Error al eliminar la operación: ${error.message || 'Por favor, intente nuevamente.'}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // Filter operations by selected client
   const operationsToShow = useMemo(() => {
+    // Ensure operations is an array
+    const safeOps = Array.isArray(operations) ? operations : [];
+    
     if (selectedClientId) {
-      return getClientOperations(selectedClientId);
+      return safeOps.filter(op => op.clientId === selectedClientId);
     }
-    return operations;
+    return safeOps;
   }, [selectedClientId, operations]);
 
-  const filteredOperations = operationsToShow.filter(op => {
-    const matchesText = op.name.toLowerCase().includes(filterText.toLowerCase()) || 
-                        op.sectorNACE.toLowerCase().includes(filterText.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || op.status === statusFilter;
-    return matchesText && matchesStatus;
-  });
+  const filteredOperations = Array.isArray(operationsToShow) 
+    ? operationsToShow.filter(op => {
+        const matchesText = op.name?.toLowerCase().includes(filterText.toLowerCase()) || 
+                            op.sectorNACE?.toLowerCase().includes(filterText.toLowerCase());
+        const matchesStatus = statusFilter === 'All' || op.status === statusFilter;
+        return matchesText && matchesStatus;
+      })
+    : [];
 
   const selectedClient = selectedClientId ? DEMO_CLIENTS.find(c => c.id === selectedClientId) : null;
 
@@ -141,10 +221,11 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
         {/* Clients Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {DEMO_CLIENTS.map(client => {
-            // Get operations for this client from data store
-            const clientOperations = getClientOperations(client.id);
-            const totalAssets = clientOperations.reduce((sum, op) => sum + op.assets.length, 0);
-            const totalCapex = clientOperations.reduce((sum, op) => sum + op.capex, 0);
+            // Get operations for this client from loaded operations
+            const safeOps = Array.isArray(operations) ? operations : [];
+            const clientOperations = safeOps.filter(op => op.clientId === client.id);
+            const totalAssets = clientOperations.reduce((sum, op) => sum + (op.assets?.length || 0), 0);
+            const totalCapex = clientOperations.reduce((sum, op) => sum + (op.capex || 0), 0);
             
             return (
               <button
@@ -218,7 +299,7 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
               <Building2 size={28} className="mr-3 text-[#00ff88]" />
               {selectedClient?.name.replace(/\s/g, '_')}
             </h1>
-            <p className={`font-mono uppercase text-xs tracking-wider transition-colors ${themeClasses.text.tertiary}`}>{selectedClient?.description || `${operationsToShow.length} OPERACIONES`}</p>
+            <p className={`font-mono uppercase text-xs tracking-wider transition-colors ${themeClasses.text.tertiary}`}>{selectedClient?.description || `${Array.isArray(operationsToShow) ? operationsToShow.length : 0} OPERACIONES`}</p>
           </div>
         </div>
       </div>
@@ -271,7 +352,7 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
             </tr>
           </thead>
           <tbody className={`${themeClasses.bg.secondary} divide-y ${themeClasses.border.default}`}>
-            {filteredOperations.map((op) => {
+            {Array.isArray(filteredOperations) ? filteredOperations.map((op) => {
               const dnshStatus = calculateOperationDnshStatus(op);
               
               return (
@@ -361,26 +442,74 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button 
-                      onClick={() => onNavigateToOperation(op.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onNavigateToOperation(op.id);
-                        }
-                      }}
-                      className="text-[#00ff88] hover:text-white bg-[#00ff88]/10 hover:bg-[#00ff88]/20 px-3 py-1.5 rounded transition-colors flex items-center ml-auto border border-[#00ff88]/30 font-mono uppercase tracking-wider text-xs focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50"
-                      aria-label={`View details for operation ${op.name}`}
-                    >
-                      DETALLES <ArrowRight size={16} className="ml-1" />
-                    </button>
+                    <div className="flex items-center justify-end space-x-2">
+                      <button 
+                        onClick={() => handleArchiveOperation(op.id)}
+                        disabled={archivingId === op.id || deletingId === op.id}
+                        className={`px-3 py-1.5 rounded transition-colors flex items-center border font-mono uppercase tracking-wider text-xs focus:outline-none focus:ring-2 ${
+                          archivingId === op.id || deletingId === op.id
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'text-amber-500 hover:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 hover:border-amber-500/50'
+                        }`}
+                        aria-label={`Archive operation ${op.name}`}
+                        title="Archivar operación"
+                      >
+                        {archivingId === op.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-amber-500 mr-1"></div>
+                            ARCHIVANDO...
+                          </>
+                        ) : (
+                          <>
+                            <Archive size={14} className="mr-1" />
+                            ARCHIVAR
+                          </>
+                        )}
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteOperation(op.id)}
+                        disabled={archivingId === op.id || deletingId === op.id}
+                        className={`px-3 py-1.5 rounded transition-colors flex items-center border font-mono uppercase tracking-wider text-xs focus:outline-none focus:ring-2 ${
+                          archivingId === op.id || deletingId === op.id
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 border-red-500/30 hover:border-red-500/50'
+                        }`}
+                        aria-label={`Delete operation ${op.name}`}
+                        title="Eliminar operación"
+                      >
+                        {deletingId === op.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-500 mr-1"></div>
+                            ELIMINANDO...
+                          </>
+                        ) : (
+                          <>
+                            <X size={14} className="mr-1" />
+                            ELIMINAR
+                          </>
+                        )}
+                      </button>
+                      <button 
+                        onClick={() => onNavigateToOperation(op.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onNavigateToOperation(op.id);
+                          }
+                        }}
+                        className="text-[#00ff88] hover:text-white bg-[#00ff88]/10 hover:bg-[#00ff88]/20 px-3 py-1.5 rounded transition-colors flex items-center border border-[#00ff88]/30 font-mono uppercase tracking-wider text-xs focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50"
+                        aria-label={`View details for operation ${op.name}`}
+                      >
+                        DETALLES <ArrowRight size={16} className="ml-1" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
-            })}
+            }) : null}
           </tbody>
         </table>
-        {filteredOperations.length === 0 && (
+        {Array.isArray(filteredOperations) && filteredOperations.length === 0 && (
             <div className={`p-8 text-center ${themeClasses.text.tertiary} font-mono uppercase text-xs`}>
                 NO_SE_ENCONTRARON_OPERACIONES
             </div>

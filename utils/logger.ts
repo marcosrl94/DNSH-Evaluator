@@ -1,6 +1,7 @@
 /**
  * Centralized logging utility
  * Replaces console.log with a configurable logging system
+ * Includes context and stack traces for better debugging
  */
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -8,11 +9,19 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 interface LogConfig {
   level: LogLevel;
   enableInProduction: boolean;
+  includeStackTraces: boolean;
+}
+
+interface LogContext {
+  component?: string;
+  action?: string;
+  [key: string]: unknown;
 }
 
 const config: LogConfig = {
   level: import.meta.env.PROD ? 'warn' : 'debug',
   enableInProduction: false,
+  includeStackTraces: !import.meta.env.PROD,
 };
 
 const levels: Record<LogLevel, number> = {
@@ -29,28 +38,61 @@ const shouldLog = (level: LogLevel): boolean => {
   return levels[level] >= levels[config.level];
 };
 
+const formatMessage = (message: string, context?: LogContext): string => {
+  if (!context) return message;
+  
+  const contextStr = Object.entries(context)
+    .filter(([_, value]) => value !== undefined)
+    .map(([key, value]) => `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}`)
+    .join(' ');
+  
+  return contextStr ? `${message} [${contextStr}]` : message;
+};
+
+const getStackTrace = (): string | undefined => {
+  if (!config.includeStackTraces) return undefined;
+  
+  try {
+    throw new Error();
+  } catch (e) {
+    const stack = (e as Error).stack;
+    if (stack) {
+      // Remove first 3 lines (Error, getStackTrace, logger function)
+      const lines = stack.split('\n');
+      return lines.slice(3).join('\n');
+    }
+  }
+  return undefined;
+};
+
 export const logger = {
-  debug: (...args: unknown[]): void => {
+  debug: (message: string, context?: LogContext): void => {
     if (shouldLog('debug')) {
-      console.debug('[DEBUG]', ...args);
+      console.debug('[DEBUG]', formatMessage(message, context));
     }
   },
   
-  info: (...args: unknown[]): void => {
+  info: (message: string, context?: LogContext): void => {
     if (shouldLog('info')) {
-      console.info('[INFO]', ...args);
+      console.info('[INFO]', formatMessage(message, context));
     }
   },
   
-  warn: (...args: unknown[]): void => {
+  warn: (message: string, context?: LogContext): void => {
     if (shouldLog('warn')) {
-      console.warn('[WARN]', ...args);
+      const stack = getStackTrace();
+      console.warn('[WARN]', formatMessage(message, context), stack || '');
     }
   },
   
-  error: (...args: unknown[]): void => {
+  error: (message: string, error?: unknown, context?: LogContext): void => {
     if (shouldLog('error')) {
-      console.error('[ERROR]', ...args);
+      const stack = error instanceof Error ? error.stack : getStackTrace();
+      const errorDetails = error instanceof Error 
+        ? { message: error.message, name: error.name, stack }
+        : error;
+      
+      console.error('[ERROR]', formatMessage(message, context), errorDetails);
     }
   },
 };

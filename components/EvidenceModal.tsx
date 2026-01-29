@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, Download, Trash2, FileText, Image, File, Eye } from 'lucide-react';
-import { EvidenceDocument, EvidenceType } from '../types';
+import { EvidenceDocument, EvidenceType, DnshObjective } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
+import { apiClient } from '../src/services/api';
+import { logger } from '../utils/logger';
 
 interface Props {
   isOpen: boolean;
@@ -61,23 +63,69 @@ const EvidenceModal: React.FC<Props> = ({
     setIsUploading(true);
     
     try {
-      // In a real app, upload to storage service (S3, etc.)
-      // For now, create a data URL or blob URL
-      const fileUrl = URL.createObjectURL(selectedFile);
+      // Use API to upload to S3
+      const USE_API = import.meta.env.VITE_USE_API === 'true' || import.meta.env.VITE_API_URL;
       
-      const newEvidence: Omit<EvidenceDocument, 'id' | 'uploadDate'> = {
-        operationId,
-        assetId,
-        name: documentName,
-        type: documentType,
-        description: documentDescription || undefined,
-        uploadedBy: 'Current User',
-        fileUrl,
-        fileSize: selectedFile.size,
-        mimeType: selectedFile.type,
-      };
+      if (USE_API) {
+        try {
+          const result = await apiClient.uploadEvidence(selectedFile, {
+            operationId,
+            assetId,
+            name: documentName,
+            type: documentType,
+            description: documentDescription || undefined,
+            relatedObjective: undefined, // Can be added later
+            relatedQuestionId: undefined,
+            tags: []
+          });
 
-      onAddEvidence(newEvidence);
+          // Create evidence document from API response
+          const newEvidence: Omit<EvidenceDocument, 'id' | 'uploadDate'> = {
+            operationId,
+            assetId,
+            name: documentName,
+            type: documentType,
+            description: documentDescription || undefined,
+            uploadedBy: 'Current User',
+            fileUrl: result.fileUrl,
+            fileSize: selectedFile.size,
+            mimeType: selectedFile.type,
+          };
+
+          onAddEvidence(newEvidence);
+        } catch (apiError) {
+          logger.warn('API upload failed, using local fallback', { error: apiError, component: 'EvidenceModal', action: 'upload' });
+          // Fallback to local URL
+          const fileUrl = URL.createObjectURL(selectedFile);
+          const newEvidence: Omit<EvidenceDocument, 'id' | 'uploadDate'> = {
+            operationId,
+            assetId,
+            name: documentName,
+            type: documentType,
+            description: documentDescription || undefined,
+            uploadedBy: 'Current User',
+            fileUrl,
+            fileSize: selectedFile.size,
+            mimeType: selectedFile.type,
+          };
+          onAddEvidence(newEvidence);
+        }
+      } else {
+        // Local fallback
+        const fileUrl = URL.createObjectURL(selectedFile);
+        const newEvidence: Omit<EvidenceDocument, 'id' | 'uploadDate'> = {
+          operationId,
+          assetId,
+          name: documentName,
+          type: documentType,
+          description: documentDescription || undefined,
+          uploadedBy: 'Current User',
+          fileUrl,
+          fileSize: selectedFile.size,
+          mimeType: selectedFile.type,
+        };
+        onAddEvidence(newEvidence);
+      }
       
       // Reset form
       setSelectedFile(null);
@@ -89,14 +137,39 @@ const EvidenceModal: React.FC<Props> = ({
         fileInputRef.current.value = '';
       }
     } catch (error) {
-      console.error('Error uploading evidence:', error);
+      logger.error('Error uploading evidence', error, { component: 'EvidenceModal', action: 'upload' });
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleDownload = (evidence: EvidenceDocument) => {
-    if (evidence.fileUrl) {
+  const handleDownload = async (evidence: EvidenceDocument) => {
+    const USE_API = import.meta.env.VITE_USE_API === 'true' || import.meta.env.VITE_API_URL;
+    
+    if (USE_API && evidence.id) {
+      try {
+        // Get signed URL from API
+        const result = await apiClient.getEvidenceDownloadUrl(evidence.id);
+        const link = document.createElement('a');
+        link.href = result.url;
+        link.download = result.filename || evidence.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (error) {
+        logger.warn('API download failed, using direct URL', { error, component: 'EvidenceModal', action: 'download' });
+        // Fallback to direct URL
+        if (evidence.fileUrl) {
+          const link = document.createElement('a');
+          link.href = evidence.fileUrl;
+          link.download = evidence.name;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+    } else if (evidence.fileUrl) {
+      // Local download
       const link = document.createElement('a');
       link.href = evidence.fileUrl;
       link.download = evidence.name;

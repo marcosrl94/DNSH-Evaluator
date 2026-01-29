@@ -13,6 +13,7 @@ import { Client, Operation, Asset, DnshObjective, EvidenceDocument, RiskBand, As
 import { getAllMeasures } from '../constants/extendedMeasures';
 import { DNSH_CHECKLIST_TEMPLATES } from '../constants';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
+import { generateEnhancedExecutiveSummary, generateEnhancedDNSHComplianceSection } from './reportingServiceEnhanced';
 
 // Report aggregation levels
 export enum ReportLevel {
@@ -29,6 +30,8 @@ export enum ReportSectionType {
   EVIDENCE_REVIEW = 'evidence_review',
   FINANCIAL_METRICS = 'financial_metrics',
   GEOGRAPHIC_ANALYSIS = 'geographic_analysis',
+  METHODOLOGY = 'methodology',
+  APPENDICES = 'appendices',
   RECOMMENDATIONS = 'recommendations'
 }
 
@@ -178,7 +181,18 @@ export const generateCompanyReport = (
     });
   });
   
-  // Generate sections
+  // Calculate percentage for objective compliance
+  const objectiveComplianceWithPercentage = Object.fromEntries(
+    Object.entries(objectiveCompliance).map(([key, value]) => [
+      key,
+      {
+        ...value,
+        percentage: value.total > 0 ? (value.compliant / value.total) * 100 : 0
+      }
+    ])
+  ) as Record<DnshObjective, { compliant: number; total: number; percentage: number }>;
+  
+  // Generate sections with enhanced content
   const sections: ReportSection[] = [
     generateExecutiveSummary(client, clientOperations, {
       totalAssets,
@@ -186,12 +200,12 @@ export const generateCompanyReport = (
       totalCapex,
       totalDealValue,
       overallComplianceRate: totalAssets > 0 ? (compliantAssets / totalAssets) * 100 : 0
-    }),
-    generateDNSHComplianceSection(clientOperations, objectiveCompliance),
+    }, objectiveComplianceWithPercentage, riskDistribution),
+    generateDNSHComplianceSection(clientOperations, objectiveComplianceWithPercentage),
     generateRiskAssessmentSection(clientOperations, riskDistribution),
     generateEvidenceReviewSection(clientOperations),
     generateFinancialMetricsSection(clientOperations, { totalCapex, totalDealValue }),
-    generateRecommendationsSection(clientOperations)
+    generateRecommendationsSection(clientOperations, objectiveComplianceWithPercentage, riskDistribution)
   ];
   
   return {
@@ -295,6 +309,7 @@ export const generatePortfolioReport = (operation: Operation): PortfolioLevelRep
     generateDNSHComplianceSectionForPortfolio(operation, objectiveCompliance),
     generateRiskAssessmentSectionForPortfolio(operation),
     generateEvidenceReviewSectionForPortfolio(operation),
+    generateGeographicAnalysisSectionForPortfolio(operation),
     generateRecommendationsSectionForPortfolio(operation)
   ];
   
@@ -375,12 +390,31 @@ export const generateAssetReport = (asset: Asset, operation: Operation): AssetLe
   };
 };
 
-// Section generators
+// Section generators - Enhanced versions
 function generateExecutiveSummary(
   client: Client,
   operations: Operation[],
-  metrics: { totalAssets: number; compliantAssets: number; totalCapex: number; totalDealValue: number; overallComplianceRate: number }
+  metrics: { totalAssets: number; compliantAssets: number; totalCapex: number; totalDealValue: number; overallComplianceRate: number },
+  objectiveCompliance?: Record<DnshObjective, { compliant: number; total: number; percentage: number }>,
+  riskDistribution?: Record<RiskBand, number>
 ): ReportSection {
+  // Use enhanced version if additional data available
+  if (objectiveCompliance && riskDistribution) {
+    const content = generateEnhancedExecutiveSummary(client, operations, metrics, objectiveCompliance, riskDistribution);
+    return {
+      id: 'exec-summary-company',
+      type: ReportSectionType.EXECUTIVE_SUMMARY,
+      title: 'Resumen Ejecutivo',
+      content,
+      editable: true,
+      metadata: {
+        lastModified: new Date().toISOString(),
+        aiGenerated: true
+      }
+    };
+  }
+  
+  // Fallback to basic version
   const content = `# Resumen Ejecutivo - ${client.name}
 
 ## Información General
@@ -414,8 +448,29 @@ ${operations.map(op => `- ${op.name}: ${op.assets.length} activos, ${op.country}
 
 function generateDNSHComplianceSection(
   operations: Operation[],
-  objectiveCompliance: Record<DnshObjective, { compliant: number; total: number }>
+  objectiveCompliance: Record<DnshObjective, { compliant: number; total: number; percentage?: number }>
 ): ReportSection {
+  // Use enhanced version if available
+  if (objectiveCompliance[Object.keys(objectiveCompliance)[0] as DnshObjective].percentage !== undefined) {
+    try {
+      const content = generateEnhancedDNSHComplianceSection(operations, objectiveCompliance as Record<DnshObjective, { compliant: number; total: number; percentage: number }>);
+      return {
+        id: 'dnsh-compliance-company',
+        type: ReportSectionType.DNSH_COMPLIANCE,
+        title: 'Cumplimiento DNSH',
+        content,
+        editable: true,
+        metadata: {
+          lastModified: new Date().toISOString(),
+          aiGenerated: true
+        }
+      };
+    } catch (error) {
+      // Fallback to basic version if enhanced fails
+    }
+  }
+  
+  // Basic version
   const objectiveLabels: Record<DnshObjective, string> = {
     [DnshObjective.MITIGATION]: '1. Mitigación Cambio Climático',
     [DnshObjective.ADAPTATION]: '2. Adaptación Cambio Climático',
@@ -430,7 +485,7 @@ function generateDNSHComplianceSection(
 ## Resumen por Objetivo
 
 ${Object.entries(objectiveCompliance).map(([objective, stats]) => {
-  const percentage = stats.total > 0 ? (stats.compliant / stats.total) * 100 : 0;
+  const percentage = stats.percentage !== undefined ? stats.percentage : (stats.total > 0 ? (stats.compliant / stats.total) * 100 : 0);
   return `### ${objectiveLabels[objective as DnshObjective]}
 - **Activos Compliant**: ${stats.compliant} / ${stats.total}
 - **Tasa de Cumplimiento**: ${percentage.toFixed(1)}%
@@ -462,19 +517,143 @@ function generateRiskAssessmentSection(
   const totalOperations = operations.length;
   const highRiskOps = riskDistribution.High + riskDistribution['Very High'];
   
-  const content = `# Evaluación de Riesgos Climáticos
+  // Enhanced risk analysis
+  const highRiskOperations = operations.filter(op => 
+    op.maxRiskBand === 'High' || op.maxRiskBand === 'Very High'
+  );
+  
+  const totalAAL = operations.reduce((sum, op) => sum + (op.totalAAL || 0), 0);
+  const avgAALPerOperation = totalOperations > 0 ? totalAAL / totalOperations : 0;
+  
+  const content = `# Evaluación Detallada de Riesgos Climáticos
 
-## Distribución de Riesgo
-- **Riesgo Bajo**: ${riskDistribution.Low} operaciones
-- **Riesgo Moderado**: ${riskDistribution.Moderate} operaciones
-- **Riesgo Alto**: ${riskDistribution.High} operaciones
-- **Riesgo Muy Alto**: ${riskDistribution['Very High']} operaciones
+## Resumen Ejecutivo de Riesgos
 
-## Operaciones de Alto Riesgo
-${highRiskOps > 0 ? `Se han identificado ${highRiskOps} operaciones con riesgo alto o muy alto que requieren medidas de adaptación prioritarias.` : 'No se han identificado operaciones con riesgo alto o muy alto.'}
+El análisis de riesgos climáticos del portfolio revela una distribución heterogénea de exposición a eventos climáticos extremos. De las ${totalOperations} operaciones evaluadas:
 
-## Recomendaciones
-Las operaciones con riesgo alto deben implementar medidas de adaptación específicas y monitoreo continuo de los riesgos climáticos identificados.
+- **${riskDistribution.Low} operaciones** (${((riskDistribution.Low / totalOperations) * 100).toFixed(1)}%) presentan **Riesgo Bajo**
+- **${riskDistribution.Moderate} operaciones** (${((riskDistribution.Moderate / totalOperations) * 100).toFixed(1)}%) presentan **Riesgo Moderado**
+- **${riskDistribution.High} operaciones** (${((riskDistribution.High / totalOperations) * 100).toFixed(1)}%) presentan **Riesgo Alto**
+- **${riskDistribution['Very High']} operaciones** (${((riskDistribution['Very High'] / totalOperations) * 100).toFixed(1)}%) presentan **Riesgo Muy Alto**
+
+## Análisis de Exposición Financiera
+
+${totalAAL > 0 
+  ? `El análisis de pérdidas anuales promedio (AAL) indica una exposición financiera total de **€${(totalAAL / 1000000).toFixed(2)}M anuales**, con un promedio de **€${(avgAALPerOperation / 1000000).toFixed(2)}M por operación**.
+
+${totalAAL > 10000000 
+  ? '**ALERTA**: La exposición financiera es significativa y requiere medidas de mitigación inmediatas para proteger el valor del portfolio.'
+  : 'La exposición financiera está dentro de niveles gestionables, aunque se recomienda monitoreo continuo.'}`
+  : 'No se dispone de datos de pérdidas anuales promedio (AAL) para todas las operaciones. Se recomienda completar esta evaluación para una comprensión completa del riesgo financiero.'}
+
+## Operaciones de Alto Riesgo - Análisis Detallado
+
+${highRiskOps > 0 
+  ? `### Identificación de Operaciones Críticas
+
+Se han identificado **${highRiskOps} operación${highRiskOps !== 1 ? 'es' : ''}** con riesgo alto o muy alto que requieren **atención prioritaria inmediata**:
+
+${highRiskOperations.slice(0, 5).map(op => {
+  const riskLevel = op.maxRiskBand === 'Very High' ? 'MUY ALTO' : 'ALTO';
+  const aalInfo = op.totalAAL ? ` (AAL: €${(op.totalAAL / 1000000).toFixed(2)}M)` : '';
+  return `- **${op.name}** (${op.country}): Riesgo ${riskLevel}${aalInfo}
+  - Activos afectados: ${op.assets.length}
+  - CAPEX: €${(op.capex / 1000000).toFixed(1)}M
+  - Medidas de adaptación requeridas: ${op.assets.some(a => a.dnshEvaluation?.adaptationMeasures && a.dnshEvaluation.adaptationMeasures.length > 0) ? 'Parcialmente implementadas' : 'Pendientes de implementación'}`;
+}).join('\n\n')}
+
+${highRiskOperations.length > 5 ? `\n*Y ${highRiskOperations.length - 5} operación${highRiskOperations.length - 5 !== 1 ? 'es' : ''} adicional${highRiskOperations.length - 5 !== 1 ? 'es' : ''}...*` : ''}
+
+### Impacto en el Portfolio
+
+Las operaciones de alto riesgo representan:
+- **${((highRiskOps / totalOperations) * 100).toFixed(1)}% del total de operaciones**
+- **CAPEX total de €${(highRiskOperations.reduce((sum, op) => sum + op.capex, 0) / 1000000).toFixed(1)}M**
+- **${highRiskOperations.reduce((sum, op) => sum + op.assets.length, 0)} activos** expuestos a riesgos climáticos significativos
+
+### Medidas de Adaptación Requeridas
+
+Para cada operación de alto riesgo se recomienda:
+
+1. **Evaluación Inmediata**: Realizar evaluación detallada de vulnerabilidades específicas
+2. **Plan de Adaptación**: Desarrollar plan de adaptación con medidas específicas y cronograma
+3. **Implementación Prioritaria**: Ejecutar medidas de adaptación de mayor impacto en los primeros 90 días
+4. **Monitoreo Continuo**: Establecer sistema de monitoreo de riesgos climáticos en tiempo real
+5. **Revisión Periódica**: Actualizar evaluaciones de riesgo anualmente o tras eventos climáticos significativos`
+  : `### Estado de Riesgo Favorable
+
+**No se han identificado operaciones con riesgo alto o muy alto**, lo que indica que la exposición climática del portfolio está adecuadamente gestionada. Esto refleja:
+
+- Ubicaciones geográficas con menor exposición a eventos climáticos extremos
+- Medidas de adaptación efectivas implementadas
+- Evaluaciones de riesgo adecuadas y actualizadas
+
+Se recomienda mantener este nivel mediante:
+- Monitoreo continuo de cambios en patrones climáticos
+- Actualización periódica de evaluaciones de riesgo
+- Revisión de medidas de adaptación existentes`}
+
+## Tipos de Riesgos Identificados
+
+Basado en las evaluaciones realizadas, los principales tipos de riesgos climáticos identificados incluyen:
+
+${operations.some(op => op.assets.some(a => a.attributes?.distanceToCoastKm && a.attributes.distanceToCoastKm < 10))
+  ? '- **Riesgo de Inundación Costera**: Activos ubicados cerca de la costa (<10km) están expuestos a riesgo de inundación por aumento del nivel del mar y marejadas ciclónicas'
+  : ''}
+${operations.some(op => op.assets.some(a => a.attributes?.elevationMeters && a.attributes.elevationMeters < 50))
+  ? '- **Riesgo de Inundación Fluvial**: Activos en elevaciones bajas están expuestos a riesgo de inundación por eventos de precipitación extrema'
+  : ''}
+${operations.some(op => op.assets.some(a => a.attributes?.waterDependency === 'High'))
+  ? '- **Riesgo de Escasez Hídrica**: Activos con alta dependencia del agua están expuestos a riesgo de disponibilidad hídrica reducida'
+  : ''}
+- **Riesgo de Temperatura Extrema**: Exposición a olas de calor y eventos de temperatura extrema que pueden afectar operaciones y activos
+- **Riesgo de Eventos Meteorológicos Extremos**: Exposición a tormentas, vientos fuertes y otros eventos meteorológicos extremos
+
+## Recomendaciones Estratégicas
+
+### Para Operaciones de Alto Riesgo
+
+${highRiskOps > 0 
+  ? `1. **Acción Inmediata** (0-30 días):
+   - Completar evaluaciones de vulnerabilidad detalladas
+   - Identificar medidas de adaptación de implementación rápida
+   - Establecer sistema de alerta temprana
+
+2. **Implementación Prioritaria** (30-90 días):
+   - Ejecutar medidas de adaptación de mayor impacto
+   - Asignar presupuesto específico para adaptación
+   - Establecer monitoreo continuo
+
+3. **Planificación Estratégica** (90-180 días):
+   - Desarrollar planes de adaptación comprehensivos
+   - Integrar adaptación en estrategia de operación
+   - Establecer procesos de revisión periódica`
+  : `1. **Mantenimiento**: Continuar con las prácticas actuales que han demostrado efectividad
+2. **Optimización**: Identificar oportunidades de mejora continua en gestión de riesgos
+3. **Preparación**: Mantener capacidad de respuesta ante cambios en patrones climáticos
+4. **Innovación**: Explorar nuevas tecnologías y prácticas de adaptación climática`}
+
+### Para Todo el Portfolio
+
+1. **Monitoreo Continuo**: Establecer sistema de monitoreo de riesgos climáticos con actualizaciones trimestrales
+2. **Actualización de Evaluaciones**: Revisar y actualizar evaluaciones de riesgo anualmente o tras eventos significativos
+3. **Capacitación**: Desarrollar capacidades internas en evaluación y gestión de riesgos climáticos
+4. **Integración**: Incorporar consideraciones de riesgo climático en decisiones de inversión y operación
+5. **Comunicación**: Establecer comunicación regular con stakeholders sobre gestión de riesgos climáticos
+
+## Métricas de Seguimiento
+
+Se recomienda establecer las siguientes métricas para monitorear la efectividad de las medidas de adaptación:
+
+- **Reducción de Riesgo**: Medir reducción en número de operaciones de alto riesgo
+- **Reducción de AAL**: Monitorear reducción en pérdidas anuales promedio
+- **Implementación de Medidas**: Seguimiento de medidas de adaptación implementadas vs. planificadas
+- **Efectividad**: Evaluar efectividad de medidas implementadas en reducción de vulnerabilidad
+- **Cobertura**: Medir porcentaje de activos con evaluaciones de riesgo actualizadas
+
+---
+
+*Esta evaluación se basa en los datos disponibles al ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })} y debe actualizarse periódicamente para reflejar cambios en el portfolio y nuevos datos climáticos.*
 `;
 
   return {
@@ -549,8 +728,165 @@ El portfolio representa una inversión significativa con un valor total de deal 
   };
 }
 
-function generateRecommendationsSection(operations: Operation[]): ReportSection {
-  const content = `# Recomendaciones
+function getObjectiveLabel(objective: DnshObjective): string {
+  const labels: Record<DnshObjective, string> = {
+    [DnshObjective.MITIGATION]: 'Mitigación del Cambio Climático',
+    [DnshObjective.ADAPTATION]: 'Adaptación al Cambio Climático',
+    [DnshObjective.WATER]: 'Uso Sostenible del Agua',
+    [DnshObjective.CIRCULAR]: 'Economía Circular',
+    [DnshObjective.POLLUTION]: 'Prevención de la Contaminación',
+    [DnshObjective.BIODIVERSITY]: 'Biodiversidad y Ecosistemas'
+  };
+  return labels[objective];
+}
+
+function generateRecommendationsSection(
+  operations: Operation[],
+  objectiveCompliance?: Record<DnshObjective, { compliant: number; total: number; percentage: number }>,
+  riskDistribution?: Record<RiskBand, number>
+): ReportSection {
+  // Enhanced recommendations based on actual data
+  let content = `# Recomendaciones Estratégicas y Acciones Prioritarias
+
+## Análisis de Situación Actual
+
+`;
+  
+  if (objectiveCompliance && riskDistribution) {
+    const overallCompliance = Object.values(objectiveCompliance).reduce((sum, stats) => sum + stats.percentage, 0) / Object.keys(objectiveCompliance).length;
+    const objectivesBelow50 = Object.values(objectiveCompliance).filter(stats => stats.percentage < 50).length;
+    const highRiskOps = riskDistribution.High + riskDistribution['Very High'];
+    
+    content += `El análisis del portfolio revela un cumplimiento promedio del ${overallCompliance.toFixed(1)}% con ${objectivesBelow50} objetivo${objectivesBelow50 !== 1 ? 's' : ''} requiriendo atención prioritaria y ${highRiskOps} operación${highRiskOps !== 1 ? 'es' : ''} con riesgo climático alto o muy alto.
+
+`;
+    
+    // Priority actions based on data
+    content += `## Acciones Prioritarias (Corto Plazo - 0-3 meses)
+
+`;
+    
+    if (objectivesBelow50 > 0) {
+      const weakestObjectives = Object.entries(objectiveCompliance)
+        .filter(([_, stats]) => stats.percentage < 50)
+        .sort((a, b) => a[1].percentage - b[1].percentage)
+        .slice(0, 2);
+      
+      content += `### 1. Abordar Objetivos DNSH Críticos
+
+**Prioridad ALTA**: ${weakestObjectives.length} objetivo${weakestObjectives.length !== 1 ? 's' : ''} con cumplimiento inferior al 50% requiere acción inmediata:
+
+${weakestObjectives.map(([obj, stats]) => {
+  const objLabel = getObjectiveLabel(obj as DnshObjective);
+  return `- **${objLabel}** (${stats.percentage.toFixed(1)}% cumplimiento): 
+  - Realizar evaluación detallada de los ${stats.total - stats.compliant} activos no compliant
+  - Identificar causas raíz específicas por activo
+  - Desarrollar planes de acción con plazos de 30, 60 y 90 días
+  - Asignar responsables y recursos específicos
+  - Establecer indicadores de seguimiento`;
+}).join('\n\n')}
+
+`;
+    }
+    
+    if (highRiskOps > 0) {
+      content += `### 2. Implementar Medidas de Adaptación en Operaciones de Alto Riesgo
+
+**Prioridad ALTA**: ${highRiskOps} operación${highRiskOps !== 1 ? 'es' : ''} con riesgo climático alto o muy alto:
+
+- Identificar medidas de adaptación específicas por operación
+- Priorizar medidas con mayor impacto en reducción de riesgo
+- Establecer cronograma de implementación con hitos de 30 días
+- Asignar presupuesto específico para medidas de adaptación
+- Implementar sistema de monitoreo de efectividad
+
+`;
+    }
+    
+    content += `### 3. Fortalecer Documentación de Evidencias
+
+- Revisar cobertura de evidencias por objetivo DNSH
+- Identificar gaps en documentación requerida
+- Establecer proceso de recopilación sistemática
+- Implementar sistema de gestión documental centralizado
+- Capacitar equipos en requisitos de documentación
+
+`;
+    
+    content += `## Acciones Estratégicas (Mediano Plazo - 3-6 meses)
+
+### 4. Establecer Proceso de Mejora Continua
+
+- Implementar revisiones trimestrales de cumplimiento DNSH
+- Desarrollar dashboard de seguimiento de métricas clave
+- Establecer comité de revisión DNSH con representación multidisciplinaria
+- Crear biblioteca de mejores prácticas y lecciones aprendidas
+- Establecer benchmarking con estándares del sector
+
+### 5. Optimización de Objetivos con Buen Desempeño
+
+Los objetivos con cumplimiento superior al 80% pueden optimizarse aún más:
+
+${Object.entries(objectiveCompliance)
+  .filter(([_, stats]) => stats.percentage >= 80)
+  .map(([obj, stats]) => {
+    const objLabel = getObjectiveLabel(obj as DnshObjective);
+    return `- **${objLabel}** (${stats.percentage.toFixed(1)}%): 
+  - Documentar y replicar mejores prácticas identificadas
+  - Compartir conocimiento entre operaciones
+  - Identificar oportunidades de mejora incremental
+  - Establecer objetivos de excelencia (95%+)`;
+  }).join('\n\n')}
+
+`;
+    
+    content += `## Acciones de Largo Plazo (6-12 meses)
+
+### 6. Transformación hacia Excelencia DNSH
+
+- Establecer objetivo de cumplimiento del 95%+ en todos los objetivos
+- Desarrollar capacidades internas de evaluación DNSH
+- Integrar DNSH en procesos de toma de decisiones de inversión
+- Establecer alianzas estratégicas para compartir mejores prácticas
+- Desarrollar capacidades de innovación en sostenibilidad
+
+### 7. Monitoreo y Reporte Continuo
+
+- Implementar sistema de reporte automático de cumplimiento
+- Establecer comunicación regular con stakeholders sobre progreso DNSH
+- Desarrollar capacidades de análisis predictivo de riesgos
+- Integrar DNSH en estrategia corporativa de sostenibilidad
+- Preparar para futuras regulaciones y estándares
+
+`;
+    
+    content += `## Métricas de Éxito
+
+Para medir el progreso de las recomendaciones, se recomienda establecer las siguientes métricas:
+
+- **Cumplimiento DNSH General**: Objetivo de ${overallCompliance < 80 ? 'alcanzar 80%+' : 'mantener 90%+'} en 6 meses
+- **Objetivos Críticos**: Reducir número de objetivos con cumplimiento <50% a cero en 3 meses
+- **Riesgo Climático**: Reducir operaciones de alto riesgo en ${highRiskOps > 0 ? '50%' : 'mantener en cero'} en 6 meses
+- **Evidencias**: Aumentar cobertura de evidencias a 100% de activos evaluados
+- **Tiempo de Respuesta**: Reducir tiempo de implementación de medidas correctivas en 30%
+
+## Recursos Requeridos
+
+Para implementar estas recomendaciones de manera efectiva, se recomienda:
+
+1. **Recursos Humanos**: Asignar equipo dedicado de 2-3 personas para coordinación DNSH
+2. **Presupuesto**: Establecer presupuesto específico para medidas correctivas y de adaptación
+3. **Tecnología**: Implementar herramientas de gestión y seguimiento DNSH
+4. **Capacitación**: Desarrollar programa de capacitación continua para equipos
+5. **Tiempo**: Establecer cronograma realista con hitos claros y responsables definidos
+
+---
+
+*Estas recomendaciones se basan en el análisis detallado del portfolio al ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })} y deben revisarse periódicamente para reflejar cambios en el portfolio y nuevas regulaciones.*
+`;
+  } else {
+    // Basic version
+    content = `# Recomendaciones
 
 ## Acciones Prioritarias
 1. Continuar el monitoreo de cumplimiento DNSH en todas las operaciones
@@ -563,6 +899,8 @@ function generateRecommendationsSection(operations: Operation[]): ReportSection 
 - Establecer procesos de revisión continua
 - Mejorar la trazabilidad de evidencias
 `;
+  }
+  
 
   return {
     id: 'recommendations-company',
@@ -693,6 +1031,41 @@ ${evidence.length > 0 ? evidence.map(ev => `- ${ev.name} (${ev.type})${ev.relate
       lastModified: new Date().toISOString(),
       aiGenerated: true,
       evidenceReferences: evidence.map(ev => ev.id)
+    }
+  };
+}
+
+function generateGeographicAnalysisSectionForPortfolio(operation: Operation): ReportSection {
+  const assets = operation.assets || [];
+  const countries = [...new Set(assets.map(a => a.country).filter(Boolean))];
+  const assetTypes = [...new Set(assets.map(a => a.assetType))];
+  
+  const content = `# Análisis Geográfico
+
+## Distribución Geográfica
+${countries.length > 0 ? `La operación comprende activos ubicados en ${countries.length} ${countries.length === 1 ? 'país' : 'países'}: ${countries.join(', ')}.` : 'No se ha especificado la ubicación geográfica de los activos.'}
+
+## Tipos de Activos
+${assetTypes.length > 0 ? `Se han identificado ${assetTypes.length} tipos de activos: ${assetTypes.join(', ')}.` : 'No se han especificado tipos de activos.'}
+
+## Análisis de Riesgo Geográfico
+Los activos están distribuidos geográficamente, lo que puede afectar la exposición a diferentes riesgos climáticos según la ubicación específica de cada activo.
+
+## Consideraciones
+- Evaluar riesgos climáticos específicos por región
+- Considerar variaciones en regulaciones ambientales por país
+- Analizar exposición a eventos climáticos extremos según ubicación
+`;
+
+  return {
+    id: 'geographic-analysis-portfolio',
+    type: ReportSectionType.GEOGRAPHIC_ANALYSIS,
+    title: 'Análisis Geográfico',
+    content,
+    editable: true,
+    metadata: {
+      lastModified: new Date().toISOString(),
+      aiGenerated: true
     }
   };
 }

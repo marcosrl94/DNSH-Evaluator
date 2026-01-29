@@ -25,6 +25,7 @@ import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 // Removed: getObjectiveStatusFromAsset - now using centralized getAssetObjectiveStatus from dnshEvaluationService
 import { validateDnshStatus } from '../services/dnshValidation';
+import { logger } from '../utils/logger';
 import { 
   createAssetGroups, 
   isHomogeneousPortfolio, 
@@ -39,7 +40,8 @@ import {
   calculateStatusFromAnswers,
   getOperationDnshStats
 } from '../services/dnshEvaluationService';
-import { updateAssetEvaluation, dataStore } from '../services/dataManagement';
+import { updateAssetEvaluation, dataStore, getAllOperations, getOperation } from '../services/dataManagement';
+import { socketService } from '../src/services/socketService';
 import { useAdaptationAssessment } from '../hooks/useAdaptationAssessment';
 import { ClimateScenario } from '../types';
 import { CLIMATE_SCENARIOS, getScenarioById } from '../constants/climateScenarios';
@@ -885,7 +887,7 @@ const AssetView: React.FC<{
           setAutoDeterminedScopes(simplified);
         })
         .catch(err => {
-          console.error('Error determining hazard scopes:', err);
+          logger.error('Error determining hazard scopes', err, { component: 'DnshEvaluationEnhanced', action: 'determineHazardScopes', assetId: asset.id });
         })
         .finally(() => {
           setIsDeterminingScopes(false);
@@ -1519,6 +1521,26 @@ const AdaptationDetailsContent: React.FC<{
     selectedScenario,
     selectedHorizon
   });
+
+  // Connect Socket.IO for this asset
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (token && import.meta.env.VITE_USE_API === 'true') {
+      socketService.joinAsset(asset.id);
+      
+      // Listen for asset updates
+      socketService.onAssetUpdated((data) => {
+        if (data.assetId === asset.id) {
+          // Asset was updated, refresh data
+          window.location.reload(); // Simple refresh for now
+        }
+      });
+
+      return () => {
+        socketService.leaveAsset(asset.id);
+      };
+    }
+  }, [asset.id]);
   
   // Use provided hazardScopeStatus from parent (AssetView) to ensure consistency
   const hazardScopeStatus = providedHazardScopeStatus;

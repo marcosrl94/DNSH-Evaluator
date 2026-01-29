@@ -25,19 +25,21 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
   const [waterRiskZones, setWaterRiskZones] = useState<any[]>([]);
   
   // Load WRI data when Water objective is active and asset is selected
+  const safeAssets = Array.isArray(operation.assets) ? operation.assets : [];
+
   useEffect(() => {
     if (activeObjective === DnshObjective.WATER && selectedAssetId) {
-      const asset = operation.assets.find(a => a.id === selectedAssetId);
+      const asset = safeAssets.find(a => a.id === selectedAssetId);
       if (asset) {
         findNearbyWaterRiskZones(asset.lat, asset.lng, 50).then(setWaterRiskZones);
       }
     } else {
       setWaterRiskZones([]);
     }
-  }, [activeObjective, selectedAssetId, operation.assets]);
+  }, [activeObjective, selectedAssetId, safeAssets]);
 
   const selectedAsset = selectedAssetId 
-    ? operation.assets.find(a => a.id === selectedAssetId)
+    ? safeAssets.find(a => a.id === selectedAssetId)
     : null;
 
   // Filter evidence by objective and asset
@@ -270,7 +272,8 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
     // Build compliant assets list with justifications
     const compliantAssets: Array<{ asset: Asset; justification: ReturnType<typeof getComplianceJustification> }> = [];
     
-    operation.assets.forEach(asset => {
+    const safeAssets = Array.isArray(operation.assets) ? operation.assets : [];
+    safeAssets.forEach(asset => {
       const status = getObjectiveStatusFromAsset(asset.dnshEvaluation, objective);
       if (status === 'Compliant') {
         const justification = getComplianceJustification(asset, objective);
@@ -655,7 +658,7 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
                             className="text-xs border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500"
                           >
                             <option value="">Todos los assets</option>
-                            {operation.assets.map(asset => (
+                            {safeAssets.map(asset => (
                               <option key={asset.id} value={asset.id}>{asset.name}</option>
                             ))}
                           </select>
@@ -847,11 +850,11 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
                 {/* Map Canvas */}
                 <div className="flex-1 relative">
                   <MapViewer 
-                    assets={selectedAsset ? [selectedAsset] : operation.assets}
+                    assets={selectedAsset ? [selectedAsset] : safeAssets}
                     activeLayers={[]}
                     theme="dark"
                     showKBAs={activeObjective === DnshObjective.BIODIVERSITY}
-                    kbas={selectedAsset ? findNearbyKBAs(selectedAsset.lat, selectedAsset.lng, 50) : operation.assets.flatMap(asset => findNearbyKBAs(asset.lat, asset.lng, 50))}
+                    kbas={selectedAsset ? findNearbyKBAs(selectedAsset.lat, selectedAsset.lng, 50) : safeAssets.flatMap(asset => findNearbyKBAs(asset.lat, asset.lng, 50))}
                     showWaterRisk={activeObjective === DnshObjective.WATER}
                     waterRiskZones={waterRiskZones}
                     onAssetClick={(assetId) => {
@@ -1090,7 +1093,7 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
                       <div className="bg-[#111111] rounded-lg p-3 border border-[#1a1a1a]">
                         <h4 className="font-semibold text-white mb-3 font-mono uppercase tracking-wider">ASSET_STATUS</h4>
                         <div className="space-y-2">
-                          {operation.assets.map(asset => {
+                          {safeAssets.map(asset => {
                             const evaluation = asset.dnshEvaluation;
                             const assetStatus = getObjectiveStatusFromAsset(evaluation, activeObjective);
                             

@@ -19,6 +19,7 @@ import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 import MapViewer from '../components/MapViewer';
 import { getAllOperations, dataStore } from '../services/dataManagement';
+import { logger } from '../utils/logger';
 
 type ViewMode = 'map' | 'list';
 type GranularityLevel = 'company' | 'portfolio' | 'asset';
@@ -43,21 +44,64 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [operations, setOperations] = useState<Operation[]>(getAllOperations());
+  const [operations, setOperations] = useState<Operation[]>([]);
   const [clients, setClients] = useState<Client[]>(DEMO_CLIENTS);
+
+  // Load operations on mount
+  React.useEffect(() => {
+    const loadOperations = async () => {
+      try {
+        const ops = await getAllOperations();
+        setOperations(Array.isArray(ops) ? ops : []);
+      } catch (error) {
+        logger.error('Error loading operations', error, { component: 'UnifiedDashboard', action: 'loadOperations' });
+        setOperations([]);
+      }
+    };
+    loadOperations();
+  }, []);
 
   // Subscribe to data store changes
   React.useEffect(() => {
-    const unsubscribe = dataStore.subscribe(() => {
-      setOperations(getAllOperations());
+    const unsubscribe = dataStore.subscribe(async () => {
+      try {
+        const ops = await getAllOperations();
+        setOperations(Array.isArray(ops) ? ops : []);
+      } catch (error) {
+        logger.error('Error loading operations', error, { component: 'UnifiedDashboard', action: 'subscribeOperations' });
+      }
     });
     return unsubscribe;
   }, []);
 
+  // Helper to safely get operations array - must be defined before useMemo
+  const safeOperations = Array.isArray(operations) ? operations : [];
+
   // Calculate metrics using fresh data from store
   const metrics = useMemo(() => {
-    const totalOperations = operations.length;
-    const totalAssets = operations.reduce((sum, op) => sum + op.assets.length, 0);
+    // Ensure operations is an array
+    if (!Array.isArray(operations)) {
+      return {
+        totalOperations: 0,
+        totalAssets: 0,
+        objectiveCompliance: {} as any,
+        overallComplianceRate: 0,
+        totalDealValue: 0,
+        totalCapex: 0,
+        weightedAvgReturn: 0,
+        totalRiskWeightedCapital: 0,
+        avgRORCE: 0,
+        totalRiskAdjustment: 0,
+        avgRiskAdjustment: 0,
+        totalSustainabilityDiscount: 0,
+        avgSustainabilityDiscount: 0,
+        riskDistribution: { 'Low': 0, 'Moderate': 0, 'High': 0, 'Very High': 0 },
+        operationsWithHighRisk: 0
+      };
+    }
+    
+    const totalOperations = safeOperations.length;
+    const totalAssets = safeOperations.reduce((sum, op) => sum + (op.assets?.length || 0), 0);
     
     const objectiveCompliance: Record<DnshObjective, { compliant: number; total: number; percentage: number }> = {
       [DnshObjective.MITIGATION]: { compliant: 0, total: 0, percentage: 0 },
@@ -76,10 +120,13 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
     let operationsWithPendingReviews = 0;
 
     const operationsToAnalyze = selectedClientId 
-      ? operations.filter(op => op.clientId === selectedClientId)
-      : operations;
+      ? safeOperations.filter(op => op.clientId === selectedClientId)
+      : safeOperations;
 
     operationsToAnalyze.forEach(operation => {
+      if (!operation.assets || !Array.isArray(operation.assets)) {
+        return;
+      }
       operation.assets.forEach(asset => {
         const evaluation = asset.dnshEvaluation;
         
@@ -137,7 +184,7 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
 
     return {
       totalOperations: operationsToAnalyze.length,
-      totalAssets: operationsToAnalyze.reduce((sum, op) => sum + op.assets.length, 0),
+      totalAssets: operationsToAnalyze.reduce((sum, op) => sum + (op.assets?.length || 0), 0),
       compliantAssets,
       nonCompliantAssets,
       conditionalAssets,
@@ -156,28 +203,28 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
         id: client.id,
         name: client.name,
         type: 'company' as const,
-        operations: operations.filter(op => op.clientId === client.id).length,
-        assets: operations.filter(op => op.clientId === client.id).reduce((sum, op) => sum + op.assets.length, 0)
+        operations: safeOperations.filter(op => op.clientId === client.id).length,
+        assets: safeOperations.filter(op => op.clientId === client.id).reduce((sum, op) => sum + (op.assets?.length || 0), 0)
       }));
     } else if (granularityLevel === 'portfolio') {
       // Show all operations, optionally filtered by selected client
       const opsToShow = selectedClientId 
-        ? operations.filter(op => op.clientId === selectedClientId)
-        : operations;
+        ? safeOperations.filter(op => op.clientId === selectedClientId)
+        : safeOperations;
       return opsToShow.map(op => ({
         id: op.id,
         name: op.name,
         type: 'portfolio' as const,
-        assets: op.assets.length,
+        assets: (op.assets?.length || 0),
         clientId: op.clientId
       }));
     } else {
       // Asset level: show assets from selected operation, or from selected client, or all
       const opsToShow = selectedOperationId
-        ? operations.filter(op => op.id === selectedOperationId)
+        ? safeOperations.filter(op => op.id === selectedOperationId)
         : selectedClientId
-          ? operations.filter(op => op.clientId === selectedClientId)
-          : operations;
+          ? safeOperations.filter(op => op.clientId === selectedClientId)
+          : safeOperations;
       return opsToShow.flatMap(op => op.assets.map(asset => ({
         id: asset.id,
         name: asset.name,
@@ -190,7 +237,7 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
         status: asset.dnshEvaluation?.overallStatus || 'Not Assessed'
       })));
     }
-  }, [granularityLevel, selectedClientId, selectedOperationId, operations, clients]);
+  }, [granularityLevel, selectedClientId, selectedOperationId, safeOperations, clients]);
 
   // Get assets for map view - show all assets based on granularity level
   // The map shows all assets at the current granularity level, optionally filtered by selections
@@ -198,22 +245,22 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
     if (granularityLevel === 'asset') {
       // Asset level: show assets from selected operation, or from selected client, or all
       const opsToShow = selectedOperationId
-        ? operations.filter(op => op.id === selectedOperationId)
+        ? safeOperations.filter(op => op.id === selectedOperationId)
         : selectedClientId
-          ? operations.filter(op => op.clientId === selectedClientId)
-          : operations;
-      return opsToShow.flatMap(op => op.assets);
+          ? safeOperations.filter(op => op.clientId === selectedClientId)
+          : safeOperations;
+      return opsToShow.flatMap(op => (op.assets || []));
     } else if (granularityLevel === 'portfolio') {
       // Portfolio level: show all assets from selected client's operations, or all if no client selected
       const opsToShow = selectedClientId
-        ? operations.filter(op => op.clientId === selectedClientId)
-        : operations;
-      return opsToShow.flatMap(op => op.assets);
+        ? safeOperations.filter(op => op.clientId === selectedClientId)
+        : safeOperations;
+      return opsToShow.flatMap(op => (op.assets || []));
     } else {
       // Company level - show all assets from all operations
-      return operations.flatMap(op => op.assets);
+      return safeOperations.flatMap(op => (op.assets || []));
     }
-  }, [granularityLevel, selectedClientId, selectedOperationId, operations]);
+  }, [granularityLevel, selectedClientId, selectedOperationId, safeOperations]);
 
   const handleItemClick = (item: any) => {
     if (granularityLevel === 'company') {
@@ -275,7 +322,7 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
   };
 
   const selectedClient = selectedClientId ? clients.find(c => c.id === selectedClientId) : null;
-  const selectedOperation = selectedOperationId ? operations.find(op => op.id === selectedOperationId) : null;
+  const selectedOperation = selectedOperationId ? safeOperations.find(op => op.id === selectedOperationId) : null;
 
   return (
     <div className={`h-full flex flex-col transition-colors ${themeClasses.bg.primary} ${themeClasses.text.primary}`}>
@@ -423,7 +470,7 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
               theme === 'dark' ? 'text-[#666666]' : 'text-gray-500'
             }`}>
               {granularityLevel === 'company' && `${clients.length} COMPAÑIAS`}
-              {granularityLevel === 'portfolio' && `${selectedClientId ? operations.filter(op => op.clientId === selectedClientId).length : operations.length} PORTFOLIOS`}
+              {granularityLevel === 'portfolio' && `${selectedClientId ? safeOperations.filter(op => op.clientId === selectedClientId).length : safeOperations.length} PORTFOLIOS`}
               {granularityLevel === 'asset' && `${displayItems.length} ASSETS`}
             </div>
           </div>
@@ -444,7 +491,7 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
               label="PORTFOLIO"
               description="Vista por operación/portfolio"
               icon={<Briefcase size={20} />}
-              count={selectedClientId ? operations.filter(op => op.clientId === selectedClientId).length : operations.length}
+              count={selectedClientId ? safeOperations.filter(op => op.clientId === selectedClientId).length : safeOperations.length}
               isActive={granularityLevel === 'portfolio'}
               onClick={() => handleGranularityLevelChange('portfolio')}
               theme={theme}
@@ -475,7 +522,7 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
                 const asset = mapAssets.find(a => a.id === assetId);
                 if (!asset) return;
 
-                const operation = operations.find(op => 
+                const operation = safeOperations.find(op => 
                   op.assets.some(a => a.id === assetId)
                 );
                 if (!operation) return;

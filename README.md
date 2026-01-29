@@ -33,7 +33,7 @@ La aplicación soporta login con Google (Gmail) para acceso rápido y seguro.
 1. Ve a [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Crea un proyecto y habilita Google Identity Services API
 3. Crea credenciales OAuth 2.0 (tipo: Aplicación web)
-4. Añade orígenes autorizados: `http://localhost:5173` (desarrollo)
+4. Añade orígenes autorizados: `http://localhost:3000` (desarrollo)
 5. Copia el Client ID y añádelo a `.env` como `VITE_GOOGLE_CLIENT_ID`
 6. Reinicia el servidor
 

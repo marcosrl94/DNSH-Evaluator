@@ -1,0 +1,66 @@
+# ============================================
+# DNSH Evaluator - Docker Compose DEV
+# Para desarrollo con hot-reload
+# ============================================
+
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: ecoinvest-postgres-dev
+    environment:
+      POSTGRES_DB: ecoinvest_dnsh_evaluator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecoinvest-network
+
+  # Backend API (desarrollo con hot-reload)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: ecoinvest-backend-dev
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ecoinvest_dnsh_evaluator
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres_dev
+      JWT_SECRET: dev-secret-key-change-in-production
+      JWT_EXPIRES_IN: 24h
+      JWT_REFRESH_EXPIRES_IN: 30d
+      CORS_ORIGIN: http://localhost:5173
+      LOG_LEVEL: debug
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecoinvest-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  ecoinvest-network:
+    driver: bridge

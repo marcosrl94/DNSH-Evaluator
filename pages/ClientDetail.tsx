@@ -20,6 +20,9 @@ const ClientDetailPage: React.FC<Props> = ({
 }) => {
   // Calculate aggregated DNSH metrics, financial metrics, and risk metrics for the client
   const clientMetrics = useMemo(() => {
+    // Ensure operations is an array
+    const safeOps = Array.isArray(operations) ? operations : [];
+    
     let totalAssets = 0;
     let compliantAssets = 0;
     let nonCompliantAssets = 0;
@@ -52,7 +55,10 @@ const ClientDetailPage: React.FC<Props> = ({
       [DnshObjective.BIODIVERSITY]: { compliant: 0, total: 0 },
     };
 
-    operations.forEach(operation => {
+    safeOps.forEach(operation => {
+      if (!operation.assets || !Array.isArray(operation.assets)) {
+        return;
+      }
       // Financial metrics aggregation
       totalCapex += operation.capex;
       totalDealValue += operation.dealPrice || operation.capex;
@@ -114,7 +120,7 @@ const ClientDetailPage: React.FC<Props> = ({
 
     // Calculate weighted average return
     const weightedAvgReturn = totalDealValue > 0
-      ? operations.reduce((sum, op) => {
+      ? safeOps.reduce((sum, op) => {
           const weight = (op.dealPrice || op.capex) / totalDealValue;
           return sum + (op.expectedReturn || 0) * weight;
         }, 0)

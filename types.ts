@@ -480,6 +480,11 @@ export interface Operation {
     includeScenarioComparison?: boolean;
     scenarioComparisonObjectives?: DnshObjective[];
   };
+  // Archive fields
+  archived?: boolean; // Si la operación está archivada
+  archivedAt?: string; // Fecha de archivado (ISO string)
+  archivedBy?: string; // Usuario que archivó la operación
+  archiveReason?: string; // Razón del archivado (opcional)
 }
 
 export interface RiskResult {

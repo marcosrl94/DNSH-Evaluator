@@ -1,182 +1,223 @@
-# Integración Completa y Escalabilidad - Resumen
+# ✅ Integración Frontend-Backend Completada
 
-## ✅ Mejoras Implementadas
+## 🎯 Estado: COMPLETADO Y FUNCIONAL
 
-### 1. Sistema de Catálogos Extensible ✅
+La integración del frontend con el nuevo backend está completa y el proyecto compila sin errores.
 
-**Archivos creados:**
-- `types/catalog.ts` - Tipos extendidos para catálogos
-- `services/catalogService.ts` - Servicio de gestión de catálogos con CRUD
-- `constants/extendedMeasures.ts` - Catálogo expandido de 17 medidas (vs 6 originales)
-- `pages/CatalogManagement.tsx` - Interfaz de gestión de catálogos
+## 📋 Cambios Realizados
 
-**Características:**
-- ✅ Catálogo expandido de medidas con metadata completa
-- ✅ Sistema CRUD completo para medidas
-- ✅ Versionado y aprobación de cambios
-- ✅ Base de conocimiento integrada
-- ✅ Casos de estudio
-- ✅ Export/Import de catálogos
+### 1. Servicios Actualizados ✅
 
-**Medidas expandidas:**
-- De 6 medidas básicas a 17 medidas completas
-- Categorizadas por tipo (Structural, Nature-Based, Technological, Institutional, Behavioral)
-- Metadata completa: costos, tiempos, mantenimiento, impacto ambiental
-- Vinculación con hazards y casos de uso
+#### `services/dataManagement.ts`
+- ✅ Convertido a usar `apiClient` cuando `VITE_USE_API=true`
+- ✅ Fallback automático a datos locales si API no disponible
+- ✅ Funciones convertidas a `async` para soportar API
+- ✅ Transformación de datos API → formato frontend
 
-### 2. Sistema de Gestión de Documentación Mejorado ✅
+#### `src/services/api.ts`
+- ✅ Cliente API completo creado previamente
+- ✅ Todas las operaciones implementadas
+- ✅ Manejo automático de tokens JWT
+- ✅ Refresh tokens
 
-**Archivo creado:**
-- `services/documentManagement.ts` - Gestión avanzada de documentos
+#### `src/services/socketService.ts`
+- ✅ Cliente Socket.IO completamente opcional
+- ✅ Carga dinámica en runtime (no en build time)
+- ✅ No rompe el build si `socket.io-client` no está instalado
+- ✅ Eventos de tiempo real configurados
 
-**Características:**
-- ✅ Versionado de documentos
-- ✅ Extracción de metadata automática
-- ✅ Sistema de revisión y aprobación
-- ✅ Scoring de calidad de documentos
-- ✅ Búsqueda avanzada por contenido
-- ✅ Vinculación con base de conocimiento
+### 2. Contextos Actualizados ✅
 
-### 3. Integración de Componentes Nuevos ✅
+#### `context/AuthContext.tsx`
+- ✅ Integrado con `apiClient` para login/register
+- ✅ Validación de tokens con API
+- ✅ Conexión automática de Socket.IO al iniciar sesión
+- ✅ Fallback a autenticación local si API no disponible
 
-**Componentes integrados:**
-- ✅ `ClimateDataPanel` - Panel de datos climáticos integrados
-- ✅ `AdaptationDecisionTree` - Árbol de decisiones de adaptación
-- ✅ `useAdaptationAssessment` - Hook optimizado para assessments
+### 3. Componentes Actualizados ✅
 
-**Integración en DnshAdaptation.tsx:**
-- ✅ Uso del catálogo extendido de medidas
-- ✅ Hook optimizado para mejor rendimiento
-- ✅ Preparado para integración de componentes nuevos
+#### `components/EvidenceModal.tsx`
+- ✅ Subida real a S3 vía API
+- ✅ Descarga con URLs firmadas
+- ✅ Fallback a URLs locales
 
-### 4. Terminología Equator Principles ✅
+#### `pages/DnshEvaluationEnhanced.tsx`
+- ✅ Integración Socket.IO para tiempo real
+- ✅ Escucha actualizaciones de operaciones/assets/evaluaciones
+- ✅ Refresh automático cuando hay cambios
 
-**Archivo:**
-- `constants/equatorPrinciples.ts`
+### 4. Configuración de Build ✅
 
-**Integrado:**
-- ✅ Terminología EP4 completa
-- ✅ Mapeo automático de términos
-- ✅ Estructuras de datos EP4
+#### `vite.config.ts`
+- ✅ `socket.io-client` marcado como external
+- ✅ No rompe el build si no está instalado
+- ✅ Optimizaciones de bundle mantenidas
 
-### 5. Datasets Integrados ✅
+## 🔧 Configuración
 
-**Servicios:**
-- `services/climateDataIntegration.ts` - Integración CORDEX + WRI Aqueduct
-- `services/adaptationDecisionTree.ts` - Árbol de decisiones
+### Variables de Entorno
 
-**Características:**
-- ✅ Carga paralela de múltiples fuentes
-- ✅ Indicadores de calidad de datos
-- ✅ Fallback automático
+Crear `.env.local` en la raíz del proyecto:
 
-## 🔄 Pendiente de Integración Completa
+```env
+# Backend API URL
+VITE_API_URL=http://localhost:3001/api/v1
 
-### En DnshAdaptation.tsx:
+# Socket.IO URL
+VITE_SOCKET_URL=http://localhost:3001
 
-1. **Añadir ClimateDataPanel** (código preparado, necesita ubicación final):
+# Enable API (set to 'true' to use backend API, false/empty for local storage)
+VITE_USE_API=true
+
+# Google OAuth Client ID (for Google login)
+VITE_GOOGLE_CLIENT_ID=your-google-client-id
+```
+
+### Modo Híbrido
+
+El sistema funciona en **modo híbrido**:
+- Si `VITE_USE_API=true` y backend disponible → usa API
+- Si backend no disponible → fallback automático a datos locales
+- Permite desarrollo sin backend y migración gradual
+
+## 🚀 Flujo de Trabajo
+
+### 1. Usuario Inicia Sesión
 ```typescript
-{integratedClimateData && selectedAsset && (
-  <ClimateDataPanel integratedData={integratedClimateData} asset={selectedAsset} />
-)}
+// AuthContext usa apiClient.login()
+// → Recibe token JWT
+// → Guarda en localStorage
+// → Conecta Socket.IO automáticamente (si disponible)
 ```
 
-2. **Añadir AdaptationDecisionTree** (código preparado):
+### 2. Carga de Operaciones
 ```typescript
-{selectedHazard && selectedAssessment && selectedAsset && showDecisionTree && (
-  <AdaptationDecisionTreeComponent
-    tree={buildAdaptationDecisionTree(...)}
-    selectedPathway={selectedPathway}
-    onPathwaySelect={setSelectedPathway}
-  />
-)}
+// getAllOperations() usa apiClient.getOperations()
+// → Obtiene datos del backend
+// → Transforma formato API → formato frontend
+// → Si falla, usa dataStore local
 ```
 
-3. **Botón para mostrar/ocultar árbol de decisiones** (añadir en UI)
-
-### En App.tsx:
-
-Añadir ruta para CatalogManagement:
+### 3. Guardar Evaluación
 ```typescript
-case 'catalog-management':
-  return <CatalogManagementPage />;
+// updateAssetEvaluation() usa apiClient.saveEvaluation()
+// → Guarda en backend
+// → Socket.IO emite evento 'evaluation:updated' (si conectado)
+// → Otros usuarios ven cambios en tiempo real
 ```
 
-## 📊 Estadísticas de Mejoras
-
-### Catálogo de Medidas:
-- **Antes:** 6 medidas básicas
-- **Ahora:** 17 medidas completas con metadata extensa
-- **Categorías:** 5 tipos (Structural, Nature-Based, Technological, Institutional, Behavioral)
-- **Metadata:** Costos, tiempos, mantenimiento, impacto ambiental, especificaciones técnicas
-
-### Sistema de Documentación:
-- **Antes:** Gestión básica de documentos
-- **Ahora:** Versionado, metadata, revisión, scoring, búsqueda avanzada
-
-### Rendimiento:
-- **Hook optimizado:** Memoización, debouncing, carga asíncrona
-- **Código escalable:** Separación de responsabilidades, servicios modulares
-
-## 🚀 Próximos Pasos Recomendados
-
-1. **Completar integración visual** en DnshAdaptation.tsx
-2. **Añadir ruta** para CatalogManagement en App.tsx
-3. **Testing** de nuevos componentes
-4. **Migración de datos** existentes al nuevo formato extendido
-5. **Documentación de usuario** para nuevas funcionalidades
-
-## 📁 Estructura de Archivos Creados
-
-```
-types/
-  catalog.ts                    # Tipos extendidos para catálogos
-
-services/
-  catalogService.ts             # Servicio CRUD de catálogos
-  documentManagement.ts         # Gestión avanzada de documentos
-  climateDataIntegration.ts     # Integración de datasets
-  adaptationDecisionTree.ts     # Árbol de decisiones
-
-constants/
-  extendedMeasures.ts           # Catálogo expandido (17 medidas)
-  equatorPrinciples.ts         # Terminología EP4
-
-components/
-  ClimateDataPanel.tsx          # Panel de datos climáticos
-  AdaptationDecisionTree.tsx    # Visualización árbol decisiones
-
-pages/
-  CatalogManagement.tsx         # Gestión de catálogos
-
-hooks/
-  useAdaptationAssessment.ts    # Hook optimizado
+### 4. Subir Evidencia
+```typescript
+// EvidenceModal usa apiClient.uploadEvidence()
+// → Sube archivo a S3
+// → Guarda metadata en DB
+// → Socket.IO emite evento 'evidence:uploaded' (si conectado)
 ```
 
-## 🔧 Mejoras de Escalabilidad
+## 📡 Socket.IO - Eventos Escuchados
 
-1. **Arquitectura modular:** Servicios separados, fácil de extender
-2. **Tipos TypeScript:** Tipado estricto para prevenir errores
-3. **Versionado:** Sistema de versiones para catálogos y documentos
-4. **Aprobación:** Workflow de aprobación para cambios
-5. **Export/Import:** Backup y restauración de datos
-6. **Búsqueda avanzada:** Filtrado y búsqueda potente
-7. **Memoización:** Optimización de rendimiento
+El frontend escucha estos eventos automáticamente (si Socket.IO está disponible):
 
-## 💡 Notas Importantes
+- `operation:updated` → Refresca operación
+- `asset:updated` → Refresca asset
+- `evaluation:updated` → Refresca evaluación
+- `evidence:uploaded` → Actualiza lista de evidencias
+- `comment:created` → Muestra nuevo comentario
+- `task:assigned` → Muestra notificación de tarea
+- `notification:received` → Muestra notificación
 
-- Todos los archivos están tipados con TypeScript
-- No hay errores de linting
-- Compatible con estructura existente
-- Migración gradual posible
-- Puede activarse/desactivarse por feature flags
+## 🔄 Migración Gradual
 
-## 🎯 Objetivos Cumplidos
+Puedes activar/desactivar el uso de API:
 
-✅ Sistema de catálogos extensible y escalable
-✅ Gestión de documentación robusta
-✅ Integración de datasets múltiples
-✅ Terminología profesional (EP4)
-✅ Optimización de rendimiento
-✅ Código modular y mantenible
-✅ Base para conocimiento compartido
+**Con Backend:**
+```env
+VITE_USE_API=true
+VITE_API_URL=http://localhost:3001/api/v1
+```
+
+**Sin Backend (modo local):**
+```env
+VITE_USE_API=false
+# O simplemente no definir VITE_API_URL
+```
+
+## ✅ Estado Actual
+
+| Componente | Estado | Notas |
+|-----------|--------|-------|
+| dataManagement.ts | ✅ Integrado | Usa API con fallback local |
+| AuthContext | ✅ Integrado | Login/register vía API |
+| EvidenceModal | ✅ Integrado | Subida a S3 |
+| Socket.IO | ✅ Opcional | No rompe build si no instalado |
+| DnshEvaluationEnhanced | ✅ Integrado | Escucha eventos |
+| Build | ✅ Funcional | Compila sin errores |
+
+## 📦 Instalación de Dependencias Opcionales
+
+Para habilitar Socket.IO completamente, instala:
+
+```bash
+npm install socket.io-client
+```
+
+**Nota:** El proyecto funciona sin esta dependencia. Socket.IO solo se activará si:
+1. `socket.io-client` está instalado
+2. `VITE_USE_API=true`
+3. El backend está corriendo
+
+## 🐛 Troubleshooting
+
+**Error: "Failed to fetch"**
+- Verifica que el backend esté corriendo
+- Verifica `VITE_API_URL` en `.env.local`
+- Verifica CORS en backend
+
+**Error: "Authentication failed"**
+- Verifica que el token esté en localStorage
+- Verifica que el backend tenga `JWT_SECRET` configurado
+- Intenta hacer login de nuevo
+
+**Socket.IO no conecta:**
+- Verifica `VITE_SOCKET_URL`
+- Verifica que el token esté válido
+- Verifica que `socket.io-client` esté instalado (opcional)
+- Revisa consola del navegador para errores
+
+**Build funciona pero Socket.IO no:**
+- Esto es normal si `socket.io-client` no está instalado
+- El servicio funciona en modo degradado
+- Instala `socket.io-client` para habilitar tiempo real
+
+## 🎯 Próximos Pasos Opcionales
+
+1. **Instalar socket.io-client:**
+   ```bash
+   npm install socket.io-client
+   ```
+
+2. **Notificaciones en tiempo real:**
+   - Mostrar toast cuando hay cambios
+   - Badge de notificaciones no leídas
+
+3. **Indicadores de edición:**
+   - Mostrar "Usuario X está editando..."
+   - Prevenir conflictos de edición
+
+4. **Optimistic updates:**
+   - Actualizar UI inmediatamente
+   - Revertir si API falla
+
+5. **Cache inteligente:**
+   - Cachear operaciones en IndexedDB
+   - Sincronizar en background
+
+## ✨ Resumen
+
+✅ **Integración completa y funcional**
+✅ **Build sin errores**
+✅ **Modo híbrido (API + local)**
+✅ **Socket.IO opcional y no bloqueante**
+✅ **Listo para desarrollo y producción**
+
+¡La integración está completa y lista para usar! 🚀

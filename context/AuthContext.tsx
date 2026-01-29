@@ -105,6 +105,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               storedUser.permissions = getPermissionsForRole(role);
             }
           }
+          
+          // If user is logged in with Google but doesn't have avatarUrl, try to get it from token
+          if (storedUser && !storedUser.avatarUrl && authProvider === 'google') {
+            const googleToken = localStorage.getItem('ecoinvest_google_token');
+            if (googleToken) {
+              try {
+                const payload = JSON.parse(atob(googleToken.split('.')[1]));
+                if (payload.picture) {
+                  storedUser.avatarUrl = payload.picture;
+                  // Update stored user
+                  localStorage.setItem('ecoinvest_user', JSON.stringify(storedUser));
+                }
+              } catch (e) {
+                // Ignore errors - token might be invalid
+              }
+            }
+          }
+          
           setUser(storedUser);
         }
       } catch (error) {

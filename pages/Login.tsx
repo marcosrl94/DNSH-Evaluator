@@ -165,13 +165,11 @@ const LoginPage: React.FC = () => {
         try {
           clearError();
           setLocalError(null);
-          setIsLoading(true);
+          // isLoading is managed by AuthContext, no need to set it manually
           await loginWithGoogle(rememberMe, keepSignedIn, credential);
           setLoginSuccess(true);
         } catch (err: any) {
           setLocalError(err.message || 'Error al procesar la autenticación de Google');
-        } finally {
-          setIsLoading(false);
         }
       })();
       return;
@@ -291,13 +289,11 @@ const LoginPage: React.FC = () => {
             try {
               clearError();
               setLocalError(null);
-              setIsLoading(true);
+              // isLoading is managed by AuthContext, no need to set it manually
               await loginWithGoogle(rememberMe, keepSignedIn, response.credential);
               setLoginSuccess(true);
             } catch (err: any) {
               setLocalError(err.message || 'Error al iniciar sesión con Google');
-            } finally {
-              setIsLoading(false);
             }
           },
           // CRITICAL: Completely disable One Tap

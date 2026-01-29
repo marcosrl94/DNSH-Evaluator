@@ -4,6 +4,8 @@ import { DEMO_OPERATIONS } from '../constants';
 import { Operation, Asset } from '../types';
 import { formatLargeNumber } from '../utils/common';
 import { logger } from '../utils/logger';
+import { useActiveContext } from '../context/ActiveContext';
+import { generateText, generateWithContext, isGeminiConfigured } from '../services/geminiService';
 
 interface Message {
   id: string;
@@ -23,6 +25,12 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   currentOperation = null,
   currentAsset = null 
 }) => {
+  // Use active context for client/project awareness
+  const { activeClient, activeOperation: contextOperation } = useActiveContext();
+  
+  // Prefer context operation over prop, but allow prop override
+  const effectiveOperation = contextOperation || currentOperation;
+  
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -56,6 +64,16 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
     let context = `Eres un asistente experto en DNSH (Do No Significant Harm) y Taxonomía Europea. `;
     context += `Estás ayudando a usuarios de una plataforma de evaluación DNSH para inversiones sostenibles.\n\n`;
     
+    // Add active client context if available
+    if (activeClient) {
+      context += `CONTEXTO DE CLIENTE ACTIVO:\n`;
+      context += `Cliente: ${activeClient.name}\n`;
+      if (activeClient.country) context += `País: ${activeClient.country}\n`;
+      if (activeClient.sector) context += `Sector: ${activeClient.sector}\n`;
+      if (activeClient.description) context += `Descripción: ${activeClient.description}\n`;
+      context += `\n`;
+    }
+    
     if (operations.length > 0) {
       context += `CONTEXTO DE OPERACIONES:\n`;
       context += `Total de operaciones: ${operations.length}\n`;
@@ -65,13 +83,13 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
       context += `\n`;
     }
 
-    if (currentOperation) {
-      context += `OPERACIÓN ACTUAL:\n`;
-      context += `Nombre: ${currentOperation.name}\n`;
-      context += `País: ${currentOperation.country}\n`;
-      context += `Sector NACE: ${currentOperation.sectorNACE}\n`;
-      context += `Activos: ${currentOperation.assets.length}\n`;
-      currentOperation.assets.forEach(asset => {
+    if (effectiveOperation) {
+      context += `OPERACIÓN ACTUAL (CONTEXTO ACTIVO):\n`;
+      context += `Nombre: ${effectiveOperation.name}\n`;
+      context += `País: ${effectiveOperation.country}\n`;
+      context += `Sector NACE: ${effectiveOperation.sectorNACE}\n`;
+      context += `Activos: ${effectiveOperation.assets.length}\n`;
+      effectiveOperation.assets.forEach(asset => {
         context += `  - ${asset.name}: ${asset.assetType}, Valor ${formatLargeNumber(asset.exposedValue)}\n`;
         if (asset.dnshEvaluation) {
           context += `    Estado DNSH: ${asset.dnshEvaluation.overallStatus}\n`;
@@ -80,23 +98,26 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
       context += `\n`;
     }
 
-    if (currentAsset) {
-      context += `ASSET ACTUAL:\n`;
-      context += `Nombre: ${currentAsset.name}\n`;
-      context += `Tipo: ${currentAsset.assetType}\n`;
-      context += `Ubicación: Lat ${currentAsset.lat}, Lng ${currentAsset.lng}\n`;
-      context += `Valor: ${formatLargeNumber(currentAsset.exposedValue)}\n`;
-      if (currentAsset.dnshEvaluation) {
-        context += `Evaluación DNSH:\n`;
-        context += `  Mitigación: ${currentAsset.dnshEvaluation.mitigationStatus}\n`;
-        context += `  Adaptación: ${currentAsset.dnshEvaluation.adaptationStatus || 'Not Assessed'}\n`;
-        context += `  Agua: ${currentAsset.dnshEvaluation.waterStatus}\n`;
-        context += `  Circular: ${currentAsset.dnshEvaluation.circularStatus}\n`;
-        context += `  Contaminación: ${currentAsset.dnshEvaluation.pollutionStatus}\n`;
-        context += `  Biodiversidad: ${currentAsset.dnshEvaluation.biodiversityStatus}\n`;
-        context += `  Estado General: ${currentAsset.dnshEvaluation.overallStatus}\n`;
+    if (currentAsset || (effectiveOperation && effectiveOperation.assets.length === 1)) {
+      const asset = currentAsset || (effectiveOperation?.assets[0]);
+      if (asset) {
+        context += `ASSET ACTUAL:\n`;
+        context += `Nombre: ${asset.name}\n`;
+        context += `Tipo: ${asset.assetType}\n`;
+        context += `Ubicación: Lat ${asset.lat}, Lng ${asset.lng}\n`;
+        context += `Valor: ${formatLargeNumber(asset.exposedValue)}\n`;
+        if (asset.dnshEvaluation) {
+          context += `Evaluación DNSH:\n`;
+          context += `  Mitigación: ${asset.dnshEvaluation.mitigationStatus}\n`;
+          context += `  Adaptación: ${asset.dnshEvaluation.adaptationStatus || 'Not Assessed'}\n`;
+          context += `  Agua: ${asset.dnshEvaluation.waterStatus}\n`;
+          context += `  Circular: ${asset.dnshEvaluation.circularStatus}\n`;
+          context += `  Contaminación: ${asset.dnshEvaluation.pollutionStatus}\n`;
+          context += `  Biodiversidad: ${asset.dnshEvaluation.biodiversityStatus}\n`;
+          context += `  Estado General: ${asset.dnshEvaluation.overallStatus}\n`;
+        }
+        context += `\n`;
       }
-      context += `\n`;
     }
 
     context += `OBJETIVOS DNSH (Taxonomía Europea):\n`;
@@ -111,14 +132,28 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
     context += `Siempre menciona referencias a la Taxonomía Europea cuando sea relevante.`;
 
     return context;
-  }, [operations, currentOperation, currentAsset]);
+  }, [operations, effectiveOperation, currentAsset, activeClient]);
 
-  // Simulate AI response (replace with actual API call)
+  // Get AI response using Gemini or fallback to rule-based
   const getAIResponse = async (userMessage: string): Promise<string> => {
-    // In a real implementation, this would call an AI API
-    // For now, we'll use a simple rule-based system with context awareness
-    
     const context = buildContext();
+    
+    // Try to use Gemini AI if available
+    if (await isGeminiConfigured()) {
+      try {
+        const prompt = `${context}\n\nPREGUNTA DEL USUARIO: ${userMessage}\n\nResponde de forma clara, concisa y profesional en español.`;
+        const response = await generateText(prompt, 'Eres un asistente experto en DNSH (Do No Significant Harm) y Taxonomía Europea. Ayudas a usuarios de una plataforma de evaluación DNSH para inversiones sostenibles.', {
+          temperature: 0.7,
+          maxTokens: 1024
+        });
+        return response;
+      } catch (error) {
+        logger.warn('Error using Gemini AI, falling back to rule-based responses:', error);
+        // Fall through to rule-based responses
+      }
+    }
+    
+    // Fallback to rule-based responses
     const lowerMessage = userMessage.toLowerCase();
 
     // Simple pattern matching with context awareness

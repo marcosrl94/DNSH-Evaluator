@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, FileText, MapPin, Zap, Building, Target, ChevronRight, Edit, CheckCircle, AlertTriangle, ShieldCheck, Droplets, RefreshCw, Leaf, Sparkles, XCircle, X } from 'lucide-react';
+import { ArrowLeft, FileText, MapPin, Zap, Building, Target, ChevronRight, Edit, CheckCircle, AlertTriangle, ShieldCheck, Droplets, RefreshCw, Leaf, Sparkles, XCircle, X, Archive } from 'lucide-react';
 import { Operation, DnshObjective, Asset } from '../types';
 import { DNSH_CHECKLIST_TEMPLATES } from '../constants';
 import MapViewer from '../components/MapViewer';
@@ -8,6 +8,9 @@ import AssetDetailPanel from '../components/AssetDetailPanel';
 import { calculateObjectiveStats } from '../utils/dnshCalculations';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
+import { useAuth } from '../context/AuthContext';
+import { archiveOperation } from '../services/dataManagement';
+import { logger } from '../utils/logger';
 
 interface Props {
   operation: Operation;
@@ -26,11 +29,13 @@ const OperationDetailPage: React.FC<Props> = ({
   onBack, 
   onUpdateOperation 
 }) => {
+  const { user } = useAuth();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [showAssetDetail, setShowAssetDetail] = useState(false);
   const [showEvidencePanel, setShowEvidencePanel] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
 
-  const selectedAsset = selectedAssetId 
+  const selectedAsset = selectedAssetId && Array.isArray(operation.assets)
     ? operation.assets.find(a => a.id === selectedAssetId)
     : null;
 
@@ -78,15 +83,36 @@ const OperationDetailPage: React.FC<Props> = ({
     }
   };
 
+  const handleArchiveOperation = async () => {
+    if (!user) return;
+    
+    if (!window.confirm('¿Está seguro de que desea archivar esta operación? Se moverá al historial y dejará de aparecer en operaciones activas.')) {
+      return;
+    }
+    
+    setIsArchiving(true);
+    try {
+      await archiveOperation(operation.id, user.name || user.email || 'System');
+      alert('Operación archivada exitosamente. Será redirigido a la lista de operaciones.');
+      onBack();
+    } catch (error) {
+      logger.error('Error archiving operation:', error);
+      alert('Error al archivar la operación. Por favor, intente nuevamente.');
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
   // Calculate DNSH status summary
   const getDnshSummary = () => {
-    const totalAssets = operation.assets.length;
+    const safeAssets = Array.isArray(operation.assets) ? operation.assets : [];
+    const totalAssets = safeAssets.length;
     let compliant = 0;
     let nonCompliant = 0;
     let conditional = 0;
     let notAssessed = 0;
 
-    operation.assets.forEach(asset => {
+    safeAssets.forEach(asset => {
       const status = asset.dnshEvaluation?.overallStatus || 'Not Assessed';
       switch (status) {
         case 'Compliant':
@@ -201,6 +227,19 @@ const OperationDetailPage: React.FC<Props> = ({
             >
               <Edit size={14} className="mr-2" />
               EDIT_OP
+            </button>
+            <button 
+              type="button"
+              onClick={handleArchiveOperation}
+              disabled={isArchiving || operation.archived}
+              className={`px-4 py-2 border rounded-lg font-medium transition-all flex items-center font-mono uppercase tracking-wider text-xs cursor-pointer active:scale-[0.95] ${
+                isArchiving || operation.archived
+                  ? 'opacity-50 cursor-not-allowed bg-[#111111] border-[#1a1a1a] text-[#666666]'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20 hover:border-amber-500/50'
+              }`}
+            >
+              <Archive size={14} className="mr-2" />
+              {isArchiving ? 'ARCHIVANDO...' : 'ARCHIVAR'}
             </button>
             <button 
               type="button"
@@ -394,11 +433,11 @@ const OperationDetailPage: React.FC<Props> = ({
           {/* Assets List */}
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className={`font-semibold ${themeClasses.text.primary} text-sm font-mono uppercase tracking-wider`}>ASSETS ({operation.assets.length})</h3>
+              <h3 className={`font-semibold ${themeClasses.text.primary} text-sm font-mono uppercase tracking-wider`}>ASSETS ({Array.isArray(operation.assets) ? operation.assets.length : 0})</h3>
               <span className={`text-xs ${themeClasses.text.tertiary} font-mono uppercase tracking-wider`}>CLICK_PARA_VER_EN_MAPA</span>
             </div>
             <div className="space-y-2">
-              {operation.assets.map(asset => {
+              {Array.isArray(operation.assets) ? operation.assets.map(asset => {
                 const isSelected = selectedAssetId === asset.id;
                 const status = asset.dnshEvaluation?.overallStatus || 'Not Assessed';
                 
@@ -468,7 +507,7 @@ const OperationDetailPage: React.FC<Props> = ({
                     </div>
                   </div>
                 );
-              })}
+              }) : null}
             </div>
           </div>
         </div>
@@ -504,7 +543,7 @@ const OperationDetailPage: React.FC<Props> = ({
 
           {/* Map Canvas */}
           <div className="flex-1 relative overflow-hidden">
-            {operation.assets && operation.assets.length > 0 ? (
+            {Array.isArray(operation.assets) && operation.assets.length > 0 ? (
               <>
                 <MapViewer 
                   assets={operation.assets} 
@@ -567,7 +606,7 @@ const OperationDetailPage: React.FC<Props> = ({
               <MapPin size={16} className="text-[#00ff88]" />
               <div>
                 <p className="text-xs text-[#666666] font-mono uppercase tracking-wider">ASSETS_EN_MAPA</p>
-                <p className="font-bold text-white font-mono">{operation.assets.length} UBICACIONES</p>
+                <p className="font-bold text-white font-mono">{Array.isArray(operation.assets) ? operation.assets.length : 0} UBICACIONES</p>
               </div>
             </div>
           </div>
