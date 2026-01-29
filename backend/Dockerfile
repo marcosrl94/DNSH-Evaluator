@@ -11,8 +11,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Instalar dependencias
-RUN npm ci --only=production && npm cache clean --force
+# Instalar TODAS las dependencias (incluyendo devDependencies para TypeScript)
+RUN npm ci && npm cache clean --force
 
 # Copiar código fuente
 COPY . .
@@ -40,12 +40,12 @@ RUN addgroup -g 1001 -S nodejs && \
 RUN chown -R nodejs:nodejs /app
 USER nodejs
 
-# Exponer puerto
+# Exponer puerto (Railway usa PORT automáticamente)
 EXPOSE 3001
 
-# Health check
+# Health check (usa PORT de Railway o 3001 por defecto)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "const port = process.env.PORT || 3001; require('http').get(`http://localhost:${port}/health`, (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Comando de inicio
 CMD ["node", "dist/index.js"]
