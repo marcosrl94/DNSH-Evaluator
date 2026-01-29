@@ -13,7 +13,7 @@ COPY vite.config.ts ./
 COPY tsconfig.json ./
 
 # Instalar dependencias
-RUN npm ci && npm cache clean --force
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 # Copiar código fuente
 COPY . .
