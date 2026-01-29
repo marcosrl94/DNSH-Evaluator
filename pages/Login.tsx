@@ -193,7 +193,9 @@ const LoginPage: React.FC = () => {
       return;
     }
 
-    const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+    // Default Client ID for production (can be overridden by env var)
+  const DEFAULT_GOOGLE_CLIENT_ID = '169907416354-f7a2tcrkhtq4pbel40tc2ho6c84npkd2.apps.googleusercontent.com';
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
     
     if (!GOOGLE_CLIENT_ID) {
       return;
@@ -486,7 +488,9 @@ const LoginPage: React.FC = () => {
     Admin: <ShieldCheck size={16} />
   };
 
-  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  // Default Client ID for production (can be overridden by env var)
+  const DEFAULT_GOOGLE_CLIENT_ID = '169907416354-f7a2tcrkhtq4pbel40tc2ho6c84npkd2.apps.googleusercontent.com';
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
   return (
     <div className="min-h-screen flex items-center justify-center relative bg-black overflow-hidden">

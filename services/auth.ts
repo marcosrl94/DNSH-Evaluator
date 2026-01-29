@@ -4,7 +4,9 @@ import { User, UserRole, UserPermissions } from '../types';
 // Google OAuth Configuration
 // In production, set VITE_GOOGLE_CLIENT_ID in your .env file
 // Get it from: https://console.cloud.google.com/apis/credentials
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+// Default Client ID for production (can be overridden by env var)
+const DEFAULT_GOOGLE_CLIENT_ID = '169907416354-f7a2tcrkhtq4pbel40tc2ho6c84npkd2.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
 // Global callback handler for Google Sign In
 let googleSignInCallback: ((user: User) => void) | null = null;
