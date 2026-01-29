@@ -351,7 +351,9 @@ const LoginPage: React.FC = () => {
             if (!googleButton) return;
             
             // Build redirect URL once
-            const redirectUri = encodeURIComponent(window.location.origin);
+            // Remove trailing slash to ensure consistency with Google Cloud Console config
+            const baseUrl = window.location.origin.replace(/\/$/, '');
+            const redirectUri = encodeURIComponent(baseUrl);
             const scope = encodeURIComponent('openid email profile');
             const nonce = Date.now().toString() + Math.random().toString(36).substring(7);
             const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
