@@ -13,7 +13,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "lint": "eslint . --ext .ts,.tsx",
-    "lint:fix": "eslint . --ext .ts,.tsx --fix"
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "redeploy": "git commit --allow-empty -m 'Trigger: Redeploy' && git push origin main"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
