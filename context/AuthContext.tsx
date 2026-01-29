@@ -1,14 +1,32 @@
+/**
+ * Authentication Context
+ * Now uses Backend API with fallback to local auth
+ */
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { User, RegisterData, UserRole } from '../types';
-import * as authService from '../services/auth';
-import { getPermissionsForRole, loginWithGoogle } from '../services/auth';
+import { User, RegisterData } from '../types';
+import { apiClient } from '../src/services/api';
+import { socketService } from '../src/services/socketService';
+import * as localAuthService from '../services/auth';
+import { getPermissionsForRole, initGoogleAuth } from '../services/auth';
+import { logger } from '../utils/logger';
+import {
+  storeSession,
+  storeRefreshToken,
+  clearSession,
+  isSessionValid,
+  getStoredUser,
+  getStoredToken,
+  getStoredRefreshToken,
+  getAuthProvider,
+  SessionConfig,
+} from '../utils/sessionManager';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string, rememberMe?: boolean, keepSignedIn?: boolean) => Promise<void>;
-  loginWithGoogle: (rememberMe?: boolean, keepSignedIn?: boolean) => Promise<void>;
+  loginWithGoogle: (rememberMe?: boolean, keepSignedIn?: boolean, credential?: string) => Promise<void>;
   register: (data: RegisterData, rememberMe?: boolean, keepSignedIn?: boolean) => Promise<void>;
   logout: () => void;
   error: string | null;
@@ -17,96 +35,80 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Feature flag: Use API or local auth
+const USE_API_ENV = import.meta.env.VITE_USE_API === 'true' || import.meta.env.VITE_API_URL;
+
+// Helper function to check if we should use API (with fallback to local)
+const shouldUseAPI = () => {
+  return USE_API_ENV; // Will fallback to local auth if API calls fail
+};
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start as loading to check localStorage
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user from localStorage on mount (session persistence)
+  // Update isLoading when user changes
   useEffect(() => {
-    const loadStoredUser = () => {
+    if (user !== null) {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // Load user from localStorage on mount
+  useEffect(() => {
+    const loadStoredUser = async () => {
       try {
-        const storedUser = localStorage.getItem('ecoinvest_user');
-        if (!storedUser) {
+        if (!isSessionValid()) {
           setIsLoading(false);
           return;
         }
 
-        // Check if "Keep me signed in" is enabled
-        const keepSignedIn = localStorage.getItem('ecoinvest_keep_signed_in') === 'true';
-        const sessionExpiry = localStorage.getItem('ecoinvest_session_expiry');
-        const authProvider = localStorage.getItem('ecoinvest_auth_provider');
+        const storedUser = getStoredUser();
+        const storedToken = getStoredToken();
         
-        // For Google users, default to keeping signed in (unless explicitly disabled)
-        const isGoogleUser = authProvider === 'google' || authProvider === 'google-demo';
-        
-        if (keepSignedIn && sessionExpiry) {
-          // Check if session has expired (30 days default)
-          const expiryDate = new Date(sessionExpiry);
-          if (new Date() > expiryDate) {
-            // Session expired, clear it
-            localStorage.removeItem('ecoinvest_user');
-            localStorage.removeItem('ecoinvest_keep_signed_in');
-            localStorage.removeItem('ecoinvest_session_expiry');
-            localStorage.removeItem('ecoinvest_auth_provider');
-            sessionStorage.removeItem('ecoinvest_temp_session');
+        if (!storedUser || !storedToken) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Validate token with API if using API
+        if (shouldUseAPI() && storedToken) {
+          try {
+            const currentUser = await apiClient.getCurrentUser();
+            
+            // Merge API user data with stored data
+            const mergedUser: User = {
+              ...storedUser,
+              ...currentUser.user,
+              permissions: storedUser.permissions || getPermissionsForRole(currentUser.user.role)
+            };
+            
+            setUser(mergedUser);
+            apiClient.setToken(storedToken);
+            // Connect Socket.IO in background, don't wait
+            socketService.connect(storedToken).catch((err) => {
+              logger.warn('Socket.IO connection failed (non-critical):', err);
+            });
+          } catch (error) {
+            // Token invalid, clear storage
+            logger.error('Token validation failed:', error);
+            clearSession();
             setIsLoading(false);
             return;
           }
-          // Session is valid, load user
-          const parsedUser = JSON.parse(storedUser);
-          if (parsedUser && !parsedUser.permissions) {
-            const role = parsedUser.role;
-            if (role) {
-              const permissions = getPermissionsForRole(role);
-              parsedUser.permissions = permissions;
-            }
-          }
-          setUser(parsedUser);
-        } else if (isGoogleUser) {
-          // Google users: auto-enable keep signed in for convenience
-          const parsedUser = JSON.parse(storedUser);
-          if (parsedUser && !parsedUser.permissions) {
-            const role = parsedUser.role;
-            if (role) {
-              const permissions = getPermissionsForRole(role);
-              parsedUser.permissions = permissions;
-            }
-          }
-          // Set keep signed in for Google users
-          localStorage.setItem('ecoinvest_keep_signed_in', 'true');
-          const expiryDate = new Date();
-          expiryDate.setDate(expiryDate.getDate() + 30);
-          localStorage.setItem('ecoinvest_session_expiry', expiryDate.toISOString());
-          setUser(parsedUser);
         } else {
-          // Temporary session - check sessionStorage
-          // If sessionStorage exists, user is still logged in for this browser session
-          // If not, it means browser was closed and we should clear the session
-          const tempSession = sessionStorage.getItem('ecoinvest_temp_session');
-          if (tempSession) {
-            // Temporary session is active, load user
-            const parsedUser = JSON.parse(storedUser);
-            if (parsedUser && !parsedUser.permissions) {
-              const role = parsedUser.role;
-              if (role) {
-                const permissions = getPermissionsForRole(role);
-                parsedUser.permissions = permissions;
-              }
+          // Local auth - load from storage
+          if (storedUser && !storedUser.permissions) {
+            const role = storedUser.role;
+            if (role) {
+              storedUser.permissions = getPermissionsForRole(role);
             }
-            setUser(parsedUser);
-          } else {
-            // No temporary session marker, clear user (browser was closed)
-            localStorage.removeItem('ecoinvest_user');
-            localStorage.removeItem('ecoinvest_auth_provider');
           }
+          setUser(storedUser);
         }
-      } catch (err) {
-        // Silently handle - session loading errors shouldn't break the app
-        localStorage.removeItem('ecoinvest_user');
-        localStorage.removeItem('ecoinvest_keep_signed_in');
-        localStorage.removeItem('ecoinvest_session_expiry');
-        sessionStorage.removeItem('ecoinvest_temp_session');
+      } catch (error) {
+        logger.error('Error loading stored user:', error);
       } finally {
         setIsLoading(false);
       }
@@ -115,145 +117,308 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loadStoredUser();
   }, []);
 
-  const login = async (email: string, password: string, rememberMe: boolean = false, keepSignedIn: boolean = false) => {
-    setIsLoading(true);
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe: boolean = false,
+    keepSignedIn: boolean = false
+  ): Promise<void> => {
     setError(null);
     try {
-      const loggedUser = await authService.login(email, password);
-      setUser(loggedUser);
-      
-      // Store user session
-      localStorage.setItem('ecoinvest_user', JSON.stringify(loggedUser));
-      
-      // Handle "Remember me" - save email only
-      if (rememberMe) {
-        localStorage.setItem('ecoinvest_remembered_email', email);
-      } else {
-        localStorage.removeItem('ecoinvest_remembered_email');
-      }
-      
-      // Handle "Keep me signed in" - extend session persistence
-      if (keepSignedIn) {
-        localStorage.setItem('ecoinvest_keep_signed_in', 'true');
-        // Set session expiry to 30 days from now
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 30);
-        localStorage.setItem('ecoinvest_session_expiry', expiryDate.toISOString());
-      } else {
-        localStorage.removeItem('ecoinvest_keep_signed_in');
-        localStorage.removeItem('ecoinvest_session_expiry');
-        // Use sessionStorage for temporary session (cleared when browser closes)
-        sessionStorage.setItem('ecoinvest_temp_session', 'true');
-      }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Invalid email or password';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const register = async (data: RegisterData, rememberMe: boolean = false, keepSignedIn: boolean = false) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const newUser = await authService.register(data);
-      setUser(newUser);
-      
-      // Store user session
-      localStorage.setItem('ecoinvest_user', JSON.stringify(newUser));
-      
-      // Handle "Remember me" - save email only
-      if (rememberMe) {
-        localStorage.setItem('ecoinvest_remembered_email', data.email);
-      } else {
-        localStorage.removeItem('ecoinvest_remembered_email');
-      }
-      
-      // Handle "Keep me signed in" - extend session persistence
-      if (keepSignedIn) {
-        localStorage.setItem('ecoinvest_keep_signed_in', 'true');
-        // Set session expiry to 30 days from now
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 30);
-        localStorage.setItem('ecoinvest_session_expiry', expiryDate.toISOString());
-      } else {
-        localStorage.removeItem('ecoinvest_keep_signed_in');
-        localStorage.removeItem('ecoinvest_session_expiry');
-        // Use sessionStorage for temporary session
-        sessionStorage.setItem('ecoinvest_temp_session', 'true');
-      }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Registration failed';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async (rememberMe: boolean = false, keepSignedIn: boolean = false) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const googleUser = await loginWithGoogle();
-      setUser(googleUser);
-      
-      // Store user session
-      localStorage.setItem('ecoinvest_user', JSON.stringify(googleUser));
-      
-      // Handle "Remember me" - save email only
-      if (rememberMe) {
-        localStorage.setItem('ecoinvest_remembered_email', googleUser.email);
-      } else {
-        localStorage.removeItem('ecoinvest_remembered_email');
-      }
-      
-      // Handle "Keep me signed in" - extend session persistence
-      // For Google users, default to keeping signed in unless explicitly disabled
-      if (keepSignedIn !== false) {
-        localStorage.setItem('ecoinvest_keep_signed_in', 'true');
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 30);
-        localStorage.setItem('ecoinvest_session_expiry', expiryDate.toISOString());
-      } else {
-        localStorage.removeItem('ecoinvest_keep_signed_in');
-        localStorage.removeItem('ecoinvest_session_expiry');
-        sessionStorage.setItem('ecoinvest_temp_session', 'true');
-      }
-    } catch (err: any) {
-      // Provide user-friendly error messages
-      let errorMessage = 'Error al iniciar sesión con Google';
-      if (err.message) {
-        if (err.message.includes('no está disponible')) {
-          errorMessage = 'Google Sign In no está disponible. Por favor, recarga la página e intenta de nuevo.';
-        } else if (err.message.includes('cancelado')) {
-          errorMessage = 'Inicio de sesión cancelado. Por favor, intenta de nuevo.';
-        } else if (err.message.includes('No se pudo mostrar')) {
-          errorMessage = 'No se pudo mostrar el inicio de sesión de Google. Por favor, intenta de nuevo.';
-        } else {
-          errorMessage = err.message;
+      if (shouldUseAPI()) {
+        try {
+          // Use API authentication
+          const response = await apiClient.login(email, password);
+        
+        // Ensure token is stored (apiClient already does this, but double-check)
+        if (response.token) {
+          apiClient.setToken(response.token);
         }
+        
+        const userData: User = {
+          id: response.user.id,
+          email: response.user.email,
+          name: response.user.name,
+          role: response.user.role as any,
+          permissions: getPermissionsForRole(response.user.role as any)
+        };
+
+        // Store session
+        storeSession(userData, response.token, { rememberMe, keepSignedIn, authProvider: 'local' });
+        if (response.refreshToken) {
+          storeRefreshToken(response.refreshToken);
+        }
+
+        // Connect Socket.IO (don't wait, let it connect in background)
+        socketService.connect(response.token).catch((err) => {
+          logger.warn('Socket.IO connection failed (non-critical):', err);
+        });
+
+        setUser(userData);
+        setIsLoading(false);
+        } catch (apiError: any) {
+          // If API fails, fallback to local auth
+          logger.warn('API login failed, using local auth:', apiError.message);
+          try {
+            const localUser = await localAuthService.login(email, password);
+            
+            // Store session for local auth
+            storeSession(localUser, '', { rememberMe, keepSignedIn, authProvider: 'local' });
+            
+            setUser(localUser);
+            setIsLoading(false);
+          } catch (localError: any) {
+            setIsLoading(false);
+            throw localError;
+          }
+        }
+      } else {
+        // Fallback to local auth
+        const localUser = await localAuthService.login(email, password);
+        
+        // Store session for local auth
+        storeSession(localUser, '', { rememberMe, keepSignedIn, authProvider: 'local' });
+        
+        setUser(localUser);
+        setIsLoading(false);
       }
-      setError(errorMessage);
-      throw err;
-    } finally {
+    } catch (error: any) {
       setIsLoading(false);
+      setError(error.message || 'Login failed');
+      throw error;
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('ecoinvest_user');
-    localStorage.removeItem('ecoinvest_keep_signed_in');
-    localStorage.removeItem('ecoinvest_session_expiry');
-    localStorage.removeItem('ecoinvest_google_access_token');
-    localStorage.removeItem('ecoinvest_google_token');
-    localStorage.removeItem('ecoinvest_auth_provider');
-    sessionStorage.removeItem('ecoinvest_temp_session');
-    // Note: We keep 'ecoinvest_remembered_email' so user doesn't have to type it again
-    authService.logout();
+  const loginWithGoogle = async (
+    rememberMe: boolean = false,
+    keepSignedIn: boolean = false,
+    credential?: string
+  ): Promise<void> => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      if (shouldUseAPI() && credential) {
+        // Use backend API with provided credential
+        try {
+          // Send credential to backend
+          const result = await apiClient.loginWithGoogle(credential);
+          
+          // Ensure token is stored
+          if (result.token) {
+            apiClient.setToken(result.token);
+          }
+          
+          const userData: User = {
+            id: result.user.id,
+            email: result.user.email,
+            name: result.user.name,
+            role: result.user.role as any,
+            permissions: getPermissionsForRole(result.user.role as any),
+            avatarUrl: result.user.avatarUrl
+          };
+
+          // Store session - Google users default to keep signed in
+          storeSession(userData, result.token, { 
+            rememberMe, 
+            keepSignedIn: keepSignedIn || true, 
+            authProvider: 'google' 
+          });
+          if (result.refreshToken) {
+            storeRefreshToken(result.refreshToken);
+          }
+
+          // Connect Socket.IO (don't wait, let it connect in background)
+          socketService.connect(result.token).catch((err) => {
+            logger.warn('Socket.IO connection failed (non-critical):', err);
+          });
+
+          setUser(userData);
+          setIsLoading(false);
+        } catch (apiError: any) {
+          // If API fails, fallback to local auth
+          logger.warn('API login failed, using local auth:', apiError.message);
+          try {
+            // Decode credential and create user locally
+            const payload = JSON.parse(atob(credential.split('.')[1]));
+            const localUser: User = {
+              id: `google-${payload.sub}`,
+              email: payload.email,
+              name: payload.name,
+              role: 'Analyst',
+              avatarUrl: payload.picture,
+              createdAt: new Date().toISOString(),
+              isActive: true,
+              permissions: getPermissionsForRole('Analyst'),
+              lastLogin: new Date().toISOString(),
+            };
+
+            // Store session
+            storeSession(localUser, credential, { 
+              rememberMe, 
+              keepSignedIn: keepSignedIn || true, 
+              authProvider: 'google' 
+            });
+
+            setUser(localUser);
+            setIsLoading(false);
+          } catch (localError: any) {
+            setIsLoading(false);
+            setError(localError.message || 'Google authentication failed');
+            throw localError;
+          }
+        }
+        } else {
+          // Local auth mode - use credential if provided, otherwise demo mode
+          if (credential) {
+            // Decode credential and create user locally
+            try {
+              const payload = JSON.parse(atob(credential.split('.')[1]));
+              
+              const localUser: User = {
+                id: `google-${payload.sub}`,
+                email: payload.email,
+                name: payload.name,
+                role: 'Analyst',
+                avatarUrl: payload.picture,
+                createdAt: new Date().toISOString(),
+                isActive: true,
+                permissions: getPermissionsForRole('Analyst'),
+                lastLogin: new Date().toISOString(),
+              };
+
+              // Store session - Google users default to keep signed in
+              storeSession(localUser, credential, { 
+                rememberMe, 
+                keepSignedIn: keepSignedIn || true, 
+                authProvider: 'google' 
+              });
+
+              setUser(localUser);
+              setIsLoading(false);
+            } catch (localError: any) {
+              setIsLoading(false);
+              setError(localError.message || 'Error al procesar la autenticación de Google');
+              throw localError;
+            }
+          } else {
+            // Demo mode - no credential provided
+            const googleUser = await localAuthService.loginWithGoogle(rememberMe, keepSignedIn);
+            const storedUser = localStorage.getItem('ecoinvest_user');
+            if (storedUser) {
+              const parsedUser = JSON.parse(storedUser);
+              setUser(parsedUser);
+            } else {
+              setUser(googleUser);
+            }
+            setIsLoading(false);
+          }
+        }
+    } catch (error: any) {
+      setIsLoading(false);
+      setError(error.message || 'Google login failed');
+      throw error;
+    }
+  };
+
+  const register = async (
+    data: RegisterData,
+    rememberMe: boolean = false,
+    keepSignedIn: boolean = false
+  ): Promise<void> => {
+    setError(null);
+    try {
+      if (shouldUseAPI()) {
+        try {
+          const response = await apiClient.register({
+            email: data.email,
+            password: data.password,
+            name: data.name
+          });
+
+        // Ensure token is stored
+        if (response.token) {
+          apiClient.setToken(response.token);
+        }
+
+        const userData: User = {
+          id: response.user.id,
+          email: response.user.email,
+          name: response.user.name,
+          role: response.user.role as any,
+          permissions: getPermissionsForRole(response.user.role as any)
+        };
+
+        // Store session
+        storeSession(userData, response.token, { rememberMe, keepSignedIn, authProvider: 'local' });
+        if (response.refreshToken) {
+          storeRefreshToken(response.refreshToken);
+        }
+
+        // Connect Socket.IO (don't wait, let it connect in background)
+        socketService.connect(response.token).catch((err) => {
+          logger.warn('Socket.IO connection failed (non-critical):', err);
+        });
+
+        setUser(userData);
+        setIsLoading(false);
+        } catch (apiError: any) {
+          // If API fails, fallback to local auth
+          logger.warn('API registration failed, using local auth:', apiError.message);
+          try {
+            const localUser = await localAuthService.register(data);
+            
+            // Store session for local auth
+            storeSession(localUser, '', { rememberMe, keepSignedIn, authProvider: 'local' });
+            
+            setUser(localUser);
+            setIsLoading(false);
+          } catch (localError: any) {
+            setIsLoading(false);
+            throw localError;
+          }
+        }
+      } else {
+        const localUser = await localAuthService.register(data);
+        
+        // Store session for local auth
+        storeSession(localUser, '', { rememberMe, keepSignedIn, authProvider: 'local' });
+        
+        setUser(localUser);
+        setIsLoading(false);
+      }
+    } catch (error: any) {
+      setIsLoading(false);
+      setError(error.message || 'Registration failed');
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      if (shouldUseAPI()) {
+        const refreshToken = getStoredRefreshToken();
+        if (refreshToken) {
+          try {
+            await apiClient.logout(refreshToken);
+          } catch (error) {
+            // Continue with logout even if API call fails
+            logger.warn('Logout API call failed:', error);
+          }
+        }
+        
+        // Disconnect Socket.IO
+        socketService.disconnect();
+      }
+
+      // Clear all storage
+      clearSession();
+
+      setUser(null);
+    } catch (error: any) {
+      logger.error('Logout error:', error);
+      // Still clear user even if logout fails
+      setUser(null);
+    }
   };
 
   const clearError = () => {
@@ -261,7 +426,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, loginWithGoogle: handleGoogleLogin, register, logout, error, clearError }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        login,
+        loginWithGoogle,
+        register,
+        logout,
+        error,
+        clearError
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

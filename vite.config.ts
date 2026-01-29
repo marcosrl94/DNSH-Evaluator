@@ -15,8 +15,8 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || '')
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || ''),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || ''),
       },
       resolve: {
         alias: {
@@ -42,20 +42,36 @@ export default defineConfig(({ mode }) => {
                 if (id.includes('jspdf') || id.includes('html2canvas')) {
                   return 'pdf-vendor';
                 }
+                if (id.includes('@google/generative-ai')) {
+                  return 'gemini-vendor';
+                }
                 // Other node_modules
                 return 'vendor';
               }
             },
           },
+          external: (id) => {
+            // Externalize socket.io-client to avoid build errors if not installed
+            if (id === 'socket.io-client' || id.includes('socket.io-client')) {
+              return true;
+            }
+            // Don't externalize @google/generative-ai - let it be bundled
+            return false;
+          }
         },
         // Increase chunk size warning limit
         chunkSizeWarningLimit: 1000,
         // Optimize for production (esbuild is faster than terser)
         minify: 'esbuild',
+        commonjsOptions: {
+          include: [/node_modules/],
+          transformMixedEsModules: true,
+        },
       },
       // Optimize dependencies
       optimizeDeps: {
         include: ['react', 'react-dom', 'leaflet', 'react-leaflet'],
+        exclude: ['socket.io-client', '@google/generative-ai'], // Don't optimize optional dependency
       },
     };
 });

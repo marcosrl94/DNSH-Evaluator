@@ -10,6 +10,10 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 let googleSignInCallback: ((user: User) => void) | null = null;
 let googleSignInErrorCallback: ((error: Error) => void) | null = null;
 
+// Global flag to prevent multiple script loads
+let scriptLoading = false;
+let scriptLoaded = false;
+
 // Initialize Google Identity Services
 export const initGoogleAuth = (): Promise<void> => {
   return new Promise((resolve, reject) => {
@@ -18,46 +22,83 @@ export const initGoogleAuth = (): Promise<void> => {
       return;
     }
 
+    // If already loaded, resolve immediately
     if (window.google?.accounts?.id) {
+      scriptLoaded = true;
       resolve();
       return;
     }
 
-    // Check if script is already loading
-    const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
-    if (existingScript) {
-      // Wait for it to load
-      existingScript.addEventListener('load', () => resolve());
-      existingScript.addEventListener('error', () => reject(new Error('Failed to load Google script')));
+    // If script is already loading, wait for it
+    if (scriptLoading) {
+      const checkInterval = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          clearInterval(checkInterval);
+          scriptLoaded = true;
+          resolve();
+        }
+      }, 100);
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        if (!window.google?.accounts?.id) {
+          reject(new Error('Timeout waiting for Google script'));
+        }
+      }, 10000);
       return;
     }
 
-    // Load Google Identity Services script
+    // Check if script element already exists
+    const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existingScript) {
+      scriptLoading = true;
+      existingScript.addEventListener('load', () => {
+        scriptLoading = false;
+        scriptLoaded = true;
+        resolve();
+      });
+      existingScript.addEventListener('error', () => {
+        scriptLoading = false;
+        reject(new Error('Failed to load Google script'));
+      });
+      return;
+    }
+
+    // Load Google Identity Services script - ONLY ONCE
+    scriptLoading = true;
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
     script.onload = () => {
+      scriptLoading = false;
       if (window.google?.accounts?.id) {
-        // Initialize Google Sign In
-        if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID !== '') {
-          window.google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: handleGoogleCredentialResponse,
-          });
+        // CRITICAL: Disable prompt() immediately after Google loads to prevent popups
+        if (!(window as any).__GOOGLE_PROMPT_DISABLED__) {
+          const originalPrompt = window.google.accounts.id.prompt;
+          window.google.accounts.id.prompt = () => {
+            // Completely disable prompts - we only want redirect mode
+            console.log('Google prompt() disabled globally - redirect mode only');
+          };
+          (window as any).__GOOGLE_PROMPT_DISABLED__ = true;
         }
+        scriptLoaded = true;
         resolve();
       } else {
         reject(new Error('Failed to load Google Identity Services'));
       }
     };
-    script.onerror = () => reject(new Error('Failed to load Google script'));
+    script.onerror = () => {
+      scriptLoading = false;
+      reject(new Error('Failed to load Google script'));
+    };
     document.head.appendChild(script);
   });
 };
 
 // Handle Google credential response
-const handleGoogleCredentialResponse = (response: { credential: string }) => {
+const handleGoogleCredentialResponse = async (response: { credential: string }) => {
   try {
     // Decode JWT credential
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
@@ -78,6 +119,7 @@ const handleGoogleCredentialResponse = (response: { credential: string }) => {
     // Store token and provider info
     localStorage.setItem('ecoinvest_google_token', response.credential);
     localStorage.setItem('ecoinvest_auth_provider', 'google');
+    localStorage.setItem('auth_token', response.credential); // Store as auth token too
 
     // Call success callback if set
     if (googleSignInCallback) {
@@ -92,7 +134,10 @@ const handleGoogleCredentialResponse = (response: { credential: string }) => {
 };
 
 // Login with Google
-export const loginWithGoogle = async (): Promise<User> => {
+export const loginWithGoogle = async (
+  rememberMe: boolean = false,
+  keepSignedIn: boolean = false
+): Promise<User> => {
   if (typeof window === 'undefined') {
     throw new Error('Window is not available');
   }
@@ -115,60 +160,25 @@ export const loginWithGoogle = async (): Promise<User> => {
       lastLogin: new Date().toISOString(),
     };
     
-    // Store provider info
+    // Store provider info and session
     localStorage.setItem('ecoinvest_auth_provider', 'google-demo');
+    localStorage.setItem('ecoinvest_user', JSON.stringify(demoGoogleUser));
+    
+    if (keepSignedIn || true) { // Default to keep signed in for Google
+      localStorage.setItem('ecoinvest_keep_signed_in', 'true');
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 30);
+      localStorage.setItem('ecoinvest_session_expiry', expiryDate.toISOString());
+    }
     
     return demoGoogleUser;
   }
 
-  // Initialize Google Auth
-  await initGoogleAuth();
-
-  return new Promise((resolve, reject) => {
-    try {
-      // Set callbacks
-      googleSignInCallback = resolve;
-      googleSignInErrorCallback = reject;
-
-      // Check if Google Identity Services is available
-      if (!window.google?.accounts?.id) {
-        reject(new Error('Google Identity Services no está disponible. Por favor, recarga la página.'));
-        return;
-      }
-
-      // Re-initialize with callback to ensure it's set
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleCredentialResponse,
-      });
-
-      // Use One Tap prompt - this will show a popup if user is not signed in
-      window.google.accounts.id.prompt((notification: any) => {
-        // Handle notification
-        if (notification) {
-          if (notification.isNotDisplayed()) {
-            // One Tap not displayed - could be due to various reasons
-            // Try to show button flow instead
-            setTimeout(() => {
-              reject(new Error('No se pudo mostrar el inicio de sesión de Google. Por favor, intenta de nuevo o usa el login con email.'));
-            }, 100);
-          } else if (notification.isSkippedMoment()) {
-            // User skipped One Tap
-            setTimeout(() => {
-              reject(new Error('Inicio de sesión cancelado. Por favor, intenta de nuevo.'));
-            }, 100);
-          } else if (notification.isDismissedMoment()) {
-            // User dismissed One Tap
-            setTimeout(() => {
-              reject(new Error('Inicio de sesión cancelado. Por favor, intenta de nuevo.'));
-            }, 100);
-          }
-        }
-      });
-    } catch (error) {
-      reject(error instanceof Error ? error : new Error('Error al inicializar Google Sign In'));
-    }
-  });
+  // IMPORTANT: Real Google OAuth is now handled in Login.tsx component
+  // This function should NOT initialize Google or call prompt() to avoid duplicate popups
+  // If we reach here with a real Client ID, it means the component didn't handle it properly
+  // Throw an error to indicate that the button-based flow should be used instead
+  throw new Error('Para usar Google OAuth, por favor haz clic en el botón "CONTINUE WITH GOOGLE" en la página de login. La inicialización automática está deshabilitada para evitar ventanas duplicadas.');
 };
 
 // Declare Google types for TypeScript
