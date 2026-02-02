@@ -38,11 +38,12 @@ export const CollaborationNotification: React.FC = () => {
 
       const editingUser = onlineUsers.find(u => u.id === data.userId);
       if (editingUser) {
+        const userName = String(editingUser.name || 'Usuario');
         addNotification({
           type: 'saved',
-          message: `${editingUser.name} guardó cambios en un asset`,
+          message: `${userName} guardó cambios en un asset`,
           userId: data.userId,
-          userName: editingUser.name,
+          userName: userName,
         });
       }
     };
@@ -54,11 +55,12 @@ export const CollaborationNotification: React.FC = () => {
 
       const editingUser = onlineUsers.find(u => u.id === data.userId);
       if (editingUser) {
+        const userName = String(editingUser.name || 'Usuario');
         addNotification({
           type: 'evidence',
-          message: `${editingUser.name} subió nueva evidencia`,
+          message: `${userName} subió nueva evidencia`,
           userId: data.userId,
-          userName: editingUser.name,
+          userName: userName,
         });
       }
     };
@@ -70,11 +72,12 @@ export const CollaborationNotification: React.FC = () => {
 
       const editingUser = onlineUsers.find(u => u.id === data.userId);
       if (editingUser) {
+        const userName = String(editingUser.name || 'Usuario');
         addNotification({
           type: 'saved',
-          message: `${editingUser.name} actualizó evaluación DNSH`,
+          message: `${userName} actualizó evaluación DNSH`,
           userId: data.userId,
-          userName: editingUser.name,
+          userName: userName,
         });
       }
     };

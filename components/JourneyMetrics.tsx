@@ -148,7 +148,7 @@ export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) =>
                       {index + 1}.
                     </span>
                     <span className={`text-sm font-medium font-mono ${themeClasses.text.primary}`}>
-                      {stageMeta.label}
+                      {String(stageMeta.label || '')}
                     </span>
                   </div>
                   <div className="flex items-center space-x-3">

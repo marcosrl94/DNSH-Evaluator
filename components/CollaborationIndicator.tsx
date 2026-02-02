@@ -48,6 +48,7 @@ export const CollaborationIndicator: React.FC<CollaborationIndicatorProps> = ({
       // Find user info
       const editingUser = onlineUsers.find(u => u.id === data.userId);
       if (editingUser) {
+        const userName = String(editingUser.name || 'Usuario');
         setEditingUsers(prev => {
           const existing = prev.find(e => e.userId === data.userId && e.field === data.field);
           if (existing) {
@@ -58,9 +59,9 @@ export const CollaborationIndicator: React.FC<CollaborationIndicatorProps> = ({
             );
           }
           return [...prev, {
-            userId: data.userId,
-            name: editingUser.name,
-            field: data.field,
+            userId: String(data.userId),
+            name: userName,
+            field: String(data.field || ''),
             timestamp: new Date()
           }];
         });
@@ -158,9 +159,9 @@ export const CollaborationIndicator: React.FC<CollaborationIndicatorProps> = ({
           <div key={`${editingUser.userId}-${editingUser.field}-${index}`} className="flex items-center space-x-2">
             <Edit size={10} className={themeClasses.text.secondary} />
             <span className={`text-xs ${themeClasses.text.secondary} font-mono`}>
-              <span className="font-semibold">{editingUser.name}</span>
+              <span className="font-semibold">{String(editingUser.name || 'Usuario')}</span>
               {' está editando '}
-              <span className="font-mono uppercase">{editingUser.field}</span>
+              <span className="font-mono uppercase">{String(editingUser.field || '')}</span>
             </span>
           </div>
         ))}

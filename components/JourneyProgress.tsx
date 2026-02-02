@@ -102,7 +102,7 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
           PROGRESO DEL JOURNEY
         </h3>
         <span className={`text-xs font-mono ${theme === 'dark' ? 'text-[#666666]' : 'text-gray-500'}`}>
-          {progress.progress}%
+          {Number(progress.progress || 0)}%
         </span>
       </div>
       
@@ -127,11 +127,11 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
               </div>
               <div className="flex-1">
                 <div className={`text-xs font-mono uppercase tracking-wider ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  {index + 1}. {stageMeta.label}
+                  {index + 1}. {String(stageMeta.label || '')}
                 </div>
                 {showLabels && (
                   <div className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-[#666666]' : 'text-gray-500'}`}>
-                    {stageMeta.description}
+                    {String(stageMeta.description || '')}
                   </div>
                 )}
               </div>
