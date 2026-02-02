@@ -59,20 +59,20 @@ export function calculateJourneyProgress(operation: Operation): JourneyProgress 
 
   // Stage 3: Manual Data Entry
   const allAssetsEvaluated = operation.assets?.every(asset => {
-    const eval = asset.dnshEvaluation;
-    if (!eval) return false;
+    const evaluation = asset.dnshEvaluation;
+    if (!evaluation) return false;
     
     // Check if all objectives have been evaluated
     const objectives = ['mitigation', 'adaptation', 'water', 'circularEconomy', 'pollution', 'biodiversity'];
     return objectives.every(obj => {
-      const objEval = eval[obj as keyof typeof eval];
+      const objEval = evaluation[obj as keyof typeof evaluation];
       return objEval && objEval.compliant !== undefined;
     });
   });
   
   const hasJustifications = operation.assets?.some(asset =>
-    asset.dnshEvaluation && Object.values(asset.dnshEvaluation).some(eval =>
-      eval && eval.justification && eval.justification.length > 0
+    asset.dnshEvaluation && Object.values(asset.dnshEvaluation).some(evalItem =>
+      evalItem && evalItem.justification && evalItem.justification.length > 0
     )
   );
   

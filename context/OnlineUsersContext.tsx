@@ -121,7 +121,18 @@ export const OnlineUsersProvider: React.FC<{ children: ReactNode }> = ({ childre
       socket.on('user:online', handleUserOnline);
       socket.on('user:offline', handleUserOffline);
       socket.on('user:update', handleUserUpdate);
-      socket.on('users:list', async (data: { users: Array<{ id: string; currentOperationId?: string; currentAssetId?: string; lastSeen: Date | string | number }> }>) => {
+      
+      // Type for users list data
+      interface UsersListData {
+        users: Array<{
+          id: string;
+          currentOperationId?: string;
+          currentAssetId?: string;
+          lastSeen: Date | string | number;
+        }>;
+      }
+      
+      socket.on('users:list', async (data: UsersListData) => {
         // Filter out current user
         const otherUsers = data.users.filter(u => u.id !== user?.id);
         
