@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ArrowLeft, FileText, MapPin, Zap, Building, Target, ChevronRight, Edit, CheckCircle, AlertTriangle, ShieldCheck, Droplets, RefreshCw, Leaf, Sparkles, XCircle, X, Archive } from 'lucide-react';
 import { Operation, DnshObjective, Asset } from '../types';
 import { DNSH_CHECKLIST_TEMPLATES } from '../constants';
 import MapViewer from '../components/MapViewer';
 import EvidenceRegistry from '../components/EvidenceRegistry';
 import AssetDetailPanel from '../components/AssetDetailPanel';
+import { JourneyProgressIndicator } from '../components/JourneyProgress';
 import { calculateObjectiveStats } from '../utils/dnshCalculations';
+import { calculateJourneyProgress } from '../services/journeyService';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 import { useAuth } from '../context/AuthContext';
@@ -189,6 +191,11 @@ const OperationDetailPage: React.FC<Props> = ({
   const { theme } = useTheme();
   const themeClasses = getThemeClasses(theme);
 
+  // Calculate journey progress
+  const journeyProgress = useMemo(() => {
+    return calculateJourneyProgress(operation);
+  }, [operation]);
+
   return (
     <div className={`h-full flex flex-col transition-colors ${themeClasses.bg.primary}`}>
       {/* Breadcrumb Navigation */}
@@ -331,8 +338,13 @@ const OperationDetailPage: React.FC<Props> = ({
                 )}
               </div>
 
+              {/* Journey Progress */}
+              <div className="mt-4">
+                <JourneyProgressIndicator progress={journeyProgress} showLabels={false} compact={false} />
+              </div>
+
               {/* DNSH Objectives Quick Access */}
-              <div className={`${themeClasses.bg.tertiary} rounded-lg p-3 border ${themeClasses.border.default}`}>
+              <div className={`${themeClasses.bg.tertiary} rounded-lg p-3 border ${themeClasses.border.default} mt-4`}>
                 <h4 className={`text-xs font-semibold ${themeClasses.text.primary} mb-2 flex items-center font-mono uppercase tracking-wider`}>
                   <Target size={12} className="mr-1" />
                   OBJETIVOS_DNSH

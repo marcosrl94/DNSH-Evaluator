@@ -6,6 +6,7 @@ import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
 import { canDisplayDnshStatus, getSafeDnshStatus } from '../services/dnshValidation';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
+import { JourneyMetrics } from '../components/JourneyMetrics';
 
 interface DashboardProps {
   onNavigateToOperation: (id: string) => void;
@@ -16,6 +17,7 @@ interface DashboardProps {
 }
 
 const DashboardPage: React.FC<DashboardProps> = ({ 
+  operations: propsOperations,
   onNavigateToOperation, 
   onNavigateToOperationsList,
   onNavigateToMapViewer,
@@ -24,10 +26,13 @@ const DashboardPage: React.FC<DashboardProps> = ({
   const { theme } = useTheme();
   const themeClasses = getThemeClasses(theme);
   
+  // Use provided operations or fallback to DEMO_OPERATIONS
+  const operations = propsOperations || DEMO_OPERATIONS;
+  
   // Calculate real metrics from operations
   const metrics = useMemo(() => {
-    const totalOperations = DEMO_OPERATIONS.length;
-    const totalAssets = DEMO_OPERATIONS.reduce((sum, op) => sum + op.assets.length, 0);
+    const totalOperations = operations.length;
+    const totalAssets = operations.reduce((sum, op) => sum + op.assets.length, 0);
     
     // Calculate compliance by objective
     const objectiveCompliance: Record<DnshObjective, { compliant: number; total: number; percentage: number }> = {
@@ -47,7 +52,7 @@ const DashboardPage: React.FC<DashboardProps> = ({
     let totalAAL = 0;
     let operationsWithPendingReviews = 0;
 
-    DEMO_OPERATIONS.forEach(operation => {
+    operations.forEach(operation => {
       operation.assets.forEach(asset => {
         const evaluation = asset.dnshEvaluation;
         
@@ -141,7 +146,7 @@ const DashboardPage: React.FC<DashboardProps> = ({
       'High': 0,
       'Very High': 0,
     };
-    DEMO_OPERATIONS.forEach(op => {
+    operations.forEach(op => {
       if (op.maxRiskBand) {
         riskDistribution[op.maxRiskBand]++;
       }
@@ -238,6 +243,9 @@ const DashboardPage: React.FC<DashboardProps> = ({
           iconBg="bg-[#111111]"
         />
       </div>
+
+      {/* Journey Metrics */}
+      <JourneyMetrics operations={operations} />
 
       {/* Status Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -355,7 +363,7 @@ const DashboardPage: React.FC<DashboardProps> = ({
             </tr>
           </thead>
           <tbody className={`${themeClasses.bg.secondary} divide-y ${themeClasses.border.default}`}>
-            {DEMO_OPERATIONS.map((op) => {
+            {operations.map((op) => {
               const client = DEMO_CLIENTS.find(c => c.id === op.clientId);
               // Calculate operation DNSH status using safe status (validates assessment)
               const assetStatuses = op.assets.map(a => {

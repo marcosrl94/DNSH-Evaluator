@@ -31,6 +31,7 @@ const DealManagementPage = lazy(() => import('./pages/DealManagement'));
 const HistoricalOperationsPage = lazy(() => import('./pages/HistoricalOperations'));
 // ClientDnshEvaluationPage removed - unified in DnshEvaluationEnhancedPage
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
+const CollaborationNotification = lazy(() => import('./components/CollaborationNotification'));
 
 // Loading fallback component
 const LoadingFallback: React.FC = () => (
@@ -448,6 +449,11 @@ const AuthenticatedApp: React.FC = () => {
         <div className={`flex-1 ${currentView === 'map-viewer' ? 'overflow-hidden relative' : 'overflow-auto'}`}>
           {renderContent}
         </div>
+
+        {/* Collaboration Notifications */}
+        <Suspense fallback={null}>
+          <CollaborationNotification />
+        </Suspense>
       </main>
 
       {/* AI Assistant - Available globally */}
