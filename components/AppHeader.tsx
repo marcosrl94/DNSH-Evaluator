@@ -7,6 +7,7 @@
 import React from 'react';
 import { Home, ChevronRight, Shield } from 'lucide-react';
 import { Client, Operation, Asset } from '../types';
+import { OnlineUsersIndicator } from './OnlineUsersIndicator';
 
 interface AppHeaderProps {
   theme: 'light' | 'dark';
@@ -59,8 +60,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       theme === 'dark' ? 'bg-black border-[#1a1a1a]' : 'bg-white border-gray-200'
     }`}>
       <div className="px-8 py-4">
-        {/* Theme Toggle Button */}
-        <div className="absolute top-4 right-4">
+        {/* Right Side Actions */}
+        <div className="absolute top-4 right-4 flex items-center space-x-3">
+          {/* Online Users Indicator */}
+          <OnlineUsersIndicator 
+            operationId={selectedOperation?.id}
+            assetId={selectedAsset?.id}
+            maxVisible={5}
+          />
+          
+          {/* Theme Toggle Button */}
           <button
             type="button"
             onClick={toggleTheme}

@@ -69,6 +69,8 @@ class SocketService {
 
     this.socket.on('connect', () => {
       logger.info('Socket.IO connected');
+      // Request user info to populate online users list
+      this.socket?.emit('users:get-list');
     });
 
     this.socket.on('disconnect', () => {
@@ -78,6 +80,15 @@ class SocketService {
     this.socket.on('error', (error: any) => {
       logger.error('Socket.IO error:', error);
     });
+  }
+
+  updatePresence(operationId?: string, assetId?: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('user:update-presence', {
+        currentOperationId: operationId,
+        currentAssetId: assetId
+      });
+    }
   }
 
   disconnect() {

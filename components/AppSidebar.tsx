@@ -5,8 +5,9 @@
  */
 
 import React from 'react';
-import { LayoutDashboard, Globe, ShieldCheck, FileText, Menu, X, Settings, BookOpen, LogOut, Briefcase, UserCircle, Upload, Archive } from 'lucide-react';
+import { LayoutDashboard, Globe, ShieldCheck, FileText, Menu, X, Settings, BookOpen, LogOut, Briefcase, UserCircle, Upload, Archive, Zap, Edit, CheckCircle2 } from 'lucide-react';
 import { User } from '../types';
+import { JourneyStage, JOURNEY_STAGES } from '../types/journey';
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -105,32 +106,100 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-6 px-3 space-y-1">
+      {/* Navigation - User Journey Based */}
+      <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+        {/* Dashboard */}
         <SidebarItem 
           icon={<LayoutDashboard size={20} />} 
-          label="CMD_DASHBOARD" 
+          label="DASHBOARD" 
           isOpen={isOpen} 
           isActive={currentView === 'dashboard'}
           theme={theme}
           onClick={() => handleNavigation('dashboard')} 
         />
+
+        {/* Journey Stages Section */}
+        {isOpen && (
+          <div className={`mt-4 mb-2 px-2 py-1 border-t ${theme === 'dark' ? 'border-[#1a1a1a]' : 'border-gray-200'}`}>
+            <p className={`text-[10px] font-mono uppercase tracking-widest ${theme === 'dark' ? 'text-[#666666]' : 'text-gray-500'}`}>
+              USER_JOURNEY
+            </p>
+          </div>
+        )}
+
+        {/* Stage 1: Input Loading */}
         <SidebarItem 
-          icon={<Briefcase size={20} />} 
-          label="OPS_MANAGEMENT" 
+          icon={<Upload size={20} />} 
+          label="1. CARGA_INPUTS" 
           isOpen={isOpen} 
-          isActive={currentView === 'operation-list' || currentView === 'operation-detail'}
+          isActive={currentView === 'deal-management' || currentView === 'operation-list'}
           theme={theme}
           onClick={() => { setSelectedOperationId(null); setCurrentView('operation-list'); }} 
         />
+
+        {/* Stage 2: Automated Evaluation */}
         <SidebarItem 
-          icon={<Upload size={20} />} 
-          label="DEAL_MANAGEMENT" 
+          icon={<Zap size={20} />} 
+          label="2. EVAL_AUTOMATIZADA" 
           isOpen={isOpen} 
-          isActive={currentView === 'deal-management'}
+          isActive={currentView === 'dnsh-evaluation'}
           theme={theme}
-          onClick={() => handleNavigation('deal-management')} 
+          onClick={() => {
+            // Navigate to evaluation if operation is selected
+            if (currentView === 'operation-detail') {
+              setCurrentView('dnsh-evaluation');
+            } else {
+              handleNavigation('operation-list');
+            }
+          }} 
         />
+
+        {/* Stage 3: Manual Data Entry */}
+        <SidebarItem 
+          icon={<Edit size={20} />} 
+          label="3. DATOS_MANUALES" 
+          isOpen={isOpen} 
+          isActive={currentView === 'dnsh-evaluation' && selectedAssetId !== null}
+          theme={theme}
+          onClick={() => {
+            // Navigate to asset evaluation for manual entry
+            if (currentView === 'dnsh-evaluation') {
+              // Already in evaluation, could show manual entry panel
+            } else {
+              handleNavigation('operation-list');
+            }
+          }} 
+        />
+
+        {/* Stage 4: Report Generation */}
+        <SidebarItem 
+          icon={<FileText size={20} />} 
+          label="4. EXPEDIENTES_REPORTES" 
+          isOpen={isOpen} 
+          isActive={currentView === 'reports'}
+          theme={theme}
+          onClick={() => setCurrentView('reports')} 
+        />
+
+        {/* Stage 5: Review & Management */}
+        <SidebarItem 
+          icon={<Archive size={20} />} 
+          label="5. REVISION_HISTORICOS" 
+          isOpen={isOpen} 
+          isActive={currentView === 'historical-operations'}
+          theme={theme}
+          onClick={() => handleNavigation('historical-operations')} 
+        />
+
+        {/* Additional Tools Section */}
+        {isOpen && (
+          <div className={`mt-4 mb-2 px-2 py-1 border-t ${theme === 'dark' ? 'border-[#1a1a1a]' : 'border-gray-200'}`}>
+            <p className={`text-[10px] font-mono uppercase tracking-widest ${theme === 'dark' ? 'text-[#666666]' : 'text-gray-500'}`}>
+              HERRAMIENTAS
+            </p>
+          </div>
+        )}
+
         <SidebarItem 
           icon={<BookOpen size={20} />} 
           label="CATALOGS" 
@@ -140,24 +209,16 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           onClick={() => setCurrentView('catalogs')} 
         />
         <SidebarItem 
-          icon={<Archive size={20} />} 
-          label="HISTORICAL" 
+          icon={<Globe size={20} />} 
+          label="MAP_VIEWER" 
           isOpen={isOpen} 
-          isActive={currentView === 'historical-operations'}
+          isActive={currentView === 'map-viewer'}
           theme={theme}
-          onClick={() => handleNavigation('historical-operations')} 
-        />
-        <SidebarItem 
-          icon={<FileText size={20} />} 
-          label="REPORTS" 
-          isOpen={isOpen} 
-          isActive={currentView === 'reports'}
-          theme={theme}
-          onClick={() => setCurrentView('reports')} 
+          onClick={() => setCurrentView('map-viewer')} 
         />
         <SidebarItem 
           icon={<Settings size={20} />} 
-          label="ADMIN" 
+          label="SETTINGS" 
           isOpen={isOpen} 
           isActive={false}
           theme={theme}

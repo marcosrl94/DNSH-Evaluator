@@ -180,6 +180,11 @@ class ApiClient {
     return this.request<{ user: any }>('/auth/me');
   }
 
+  async getUser(userId: string) {
+    const response = await this.request<{ user: any }>(`/users/${userId}`);
+    return response;
+  }
+
   // Clients endpoints
   async getClients() {
     return this.request<{ clients: any[] }>('/clients');

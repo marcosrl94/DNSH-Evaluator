@@ -6,6 +6,7 @@ import { Client } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import { ActiveContextProvider } from './context/ActiveContext';
+import { OnlineUsersProvider } from './context/OnlineUsersContext';
 import { hasPermission } from './services/auth';
 import { AssetDnshEvaluation, Operation, DnshObjective } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -82,6 +83,31 @@ const AuthenticatedApp: React.FC = () => {
     });
     return unsubscribe;
   }, []);
+
+  // Update user presence when navigating
+  useEffect(() => {
+    const { socketService } = require('./src/services/socketService');
+    if (socketService.isConnected()) {
+      socketService.updatePresence(selectedOperationId || undefined, selectedAssetId || undefined);
+      
+      // Join/leave operation room
+      if (selectedOperationId) {
+        socketService.joinOperation(selectedOperationId);
+      }
+      if (selectedAssetId) {
+        socketService.joinAsset(selectedAssetId);
+      }
+      
+      return () => {
+        if (selectedOperationId) {
+          socketService.leaveOperation(selectedOperationId);
+        }
+        if (selectedAssetId) {
+          socketService.leaveAsset(selectedAssetId);
+        }
+      };
+    }
+  }, [selectedOperationId, selectedAssetId]);
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -441,9 +467,11 @@ const App: React.FC = () => {
     return (
         <ErrorBoundary>
             <AuthProvider>
-                <ActiveContextProvider>
-                    <AppContent />
-                </ActiveContextProvider>
+                <OnlineUsersProvider>
+                    <ActiveContextProvider>
+                        <AppContent />
+                    </ActiveContextProvider>
+                </OnlineUsersProvider>
             </AuthProvider>
         </ErrorBoundary>
     );

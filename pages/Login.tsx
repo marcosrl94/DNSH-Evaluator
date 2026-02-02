@@ -284,9 +284,12 @@ const LoginPage: React.FC = () => {
         // Initialize Google with callback - ONLY ONCE
         // CRITICAL: Configure for redirect-only mode, no popups, no One Tap
         // IMPORTANT: Completely disable One Tap and force redirect
+        // Normalize redirect URI to match Google Cloud Console exactly (no trailing slash)
+        const normalizedRedirectUri = window.location.origin.replace(/\/$/, '');
+        
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback_uri: window.location.origin, // Explicit redirect URI
+          callback_uri: normalizedRedirectUri, // Explicit redirect URI (normalized, no trailing slash)
           callback: async (response: { credential: string }) => {
             try {
               clearError();
@@ -326,6 +329,9 @@ const LoginPage: React.FC = () => {
           }
 
           // Render button (Google may ignore ux_mode, so we'll override clicks)
+          // Normalize redirect URI to match Google Cloud Console exactly (no trailing slash)
+          const normalizedRedirectUri = window.location.origin.replace(/\/$/, '');
+          
           window.google.accounts.id.renderButton(googleButtonRef.current, {
             type: 'standard',
             theme: 'outline',
@@ -336,7 +342,7 @@ const LoginPage: React.FC = () => {
             shape: 'rectangular',
             // Try to set redirect mode (but Google may ignore it)
             ux_mode: 'redirect',
-            redirect_uri: window.location.origin,
+            redirect_uri: normalizedRedirectUri,
             use_fedcm_for_prompt: false,
             auto_select: false,
             cancel_on_tap_outside: false,
@@ -351,12 +357,17 @@ const LoginPage: React.FC = () => {
             if (!googleButton) return;
             
             // Build redirect URL once
-            // Remove trailing slash to ensure consistency with Google Cloud Console config
+            // CRITICAL: Normalize redirect URI to match Google Cloud Console exactly
+            // Must match EXACTLY what's configured in Google Cloud Console (no trailing slash)
             const baseUrl = window.location.origin.replace(/\/$/, '');
             const redirectUri = encodeURIComponent(baseUrl);
             const scope = encodeURIComponent('openid email profile');
             const nonce = Date.now().toString() + Math.random().toString(36).substring(7);
             const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
+            
+            // Debug: Log redirect URI to help troubleshoot (remove in production if needed)
+            console.log('[Google OAuth] Redirect URI:', baseUrl);
+            console.log('[Google OAuth] Full auth URL:', authUrl.substring(0, 200) + '...');
             
             // Clone to remove ALL Google handlers
             const newButton = googleButton.cloneNode(true) as HTMLElement;
