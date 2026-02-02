@@ -162,7 +162,7 @@ export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) =>
                 </div>
                 <div className={`h-2 rounded-full overflow-hidden ${themeClasses.bg.secondary}`}>
                   <div
-                    className={`h-full transition-all ${themeClasses.text.accent.replace('text-', 'bg-')}`}
+                    className={`h-full transition-all ${themeClasses.text.accent ? themeClasses.text.accent.replace('text-', 'bg-') : 'bg-blue-500'}`}
                     style={{ width: `${percentage}%` }}
                   />
                 </div>

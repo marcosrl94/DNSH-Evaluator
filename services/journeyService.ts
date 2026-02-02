@@ -30,8 +30,8 @@ export function calculateJourneyProgress(operation: Operation): JourneyProgress 
       stage: JourneyStage.INPUT_LOADING,
       completed: false,
       progress,
-      lastUpdated: operation.updatedAt || operation.createdAt,
-      updatedBy: operation.updatedBy || 'system'
+      lastUpdated: String(operation.updatedAt || operation.createdAt || new Date().toISOString()),
+      updatedBy: String(operation.updatedBy || 'system')
     };
   }
 
@@ -52,8 +52,8 @@ export function calculateJourneyProgress(operation: Operation): JourneyProgress 
       stage: currentStage,
       completed: false,
       progress,
-      lastUpdated: operation.updatedAt || operation.createdAt,
-      updatedBy: operation.updatedBy || 'system'
+      lastUpdated: String(operation.updatedAt || operation.createdAt || new Date().toISOString()),
+      updatedBy: String(operation.updatedBy || 'system')
     };
   }
 
@@ -86,8 +86,8 @@ export function calculateJourneyProgress(operation: Operation): JourneyProgress 
       stage: currentStage,
       completed: false,
       progress,
-      lastUpdated: operation.updatedAt || operation.createdAt,
-      updatedBy: operation.updatedBy || 'system'
+      lastUpdated: String(operation.updatedAt || operation.createdAt || new Date().toISOString()),
+      updatedBy: String(operation.updatedBy || 'system')
     };
   }
 
@@ -103,8 +103,8 @@ export function calculateJourneyProgress(operation: Operation): JourneyProgress 
       stage: currentStage,
       completed: false,
       progress,
-      lastUpdated: operation.updatedAt || operation.createdAt,
-      updatedBy: operation.updatedBy || 'system'
+      lastUpdated: String(operation.updatedAt || operation.createdAt || new Date().toISOString()),
+      updatedBy: String(operation.updatedBy || 'system')
     };
   }
 

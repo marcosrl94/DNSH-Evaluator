@@ -152,9 +152,11 @@ export const CollaborationNotification: React.FC = () => {
             {getNotificationIcon(notification.type)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium font-mono">{notification.message}</p>
+            <p className="text-sm font-medium font-mono">{String(notification.message || '')}</p>
             <p className="text-xs opacity-75 mt-0.5">
-              {new Date(notification.timestamp).toLocaleTimeString()}
+              {notification.timestamp instanceof Date 
+                ? notification.timestamp.toLocaleTimeString()
+                : new Date(notification.timestamp).toLocaleTimeString()}
             </p>
           </div>
           <button

@@ -34,13 +34,15 @@ export const OnlineUsersIndicator: React.FC<OnlineUsersIndicatorProps> = ({
   const visibleUsers = relevantUsers.slice(0, maxVisible);
   const remainingCount = relevantUsers.length - maxVisible;
 
-  const getInitials = (name: string): string => {
+  const getInitials = (name: string | undefined): string => {
+    if (!name || typeof name !== 'string') return 'U';
     return name
       .split(' ')
-      .map(n => n[0])
+      .map(n => n && n[0] ? n[0] : '')
+      .filter(Boolean)
       .join('')
       .toUpperCase()
-      .slice(0, 2);
+      .slice(0, 2) || 'U';
   };
 
   const getAvatarColor = (userId: string): string => {
@@ -92,8 +94,8 @@ export const OnlineUsersIndicator: React.FC<OnlineUsersIndicatorProps> = ({
             >
               {visibleUsers[0].avatarUrl ? (
                 <img
-                  src={visibleUsers[0].avatarUrl}
-                  alt={visibleUsers[0].name}
+                  src={String(visibleUsers[0].avatarUrl)}
+                  alt={String(visibleUsers[0].name || 'User')}
                   className="w-full h-full rounded-full object-cover"
                 />
               ) : (
@@ -142,8 +144,8 @@ export const OnlineUsersIndicator: React.FC<OnlineUsersIndicatorProps> = ({
                   >
                     {user.avatarUrl ? (
                       <img
-                        src={user.avatarUrl}
-                        alt={user.name}
+                        src={String(user.avatarUrl)}
+                        alt={String(user.name || 'User')}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
@@ -157,10 +159,10 @@ export const OnlineUsersIndicator: React.FC<OnlineUsersIndicatorProps> = ({
                 {/* User Info */}
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-medium truncate ${themeClasses.text.primary}`}>
-                    {user.name}
+                    {String(user.name || 'User')}
                   </p>
                   <p className={`text-xs truncate ${themeClasses.text.secondary}`}>
-                    {user.role}
+                    {String(user.role || 'Analyst')}
                   </p>
                 </div>
               </div>

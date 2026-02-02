@@ -121,9 +121,20 @@ export const OnlineUsersProvider: React.FC<{ children: ReactNode }> = ({ childre
       socket.on('user:online', handleUserOnline);
       socket.on('user:offline', handleUserOffline);
       socket.on('user:update', handleUserUpdate);
-      socket.on('users:list', async (data: { users: Array<{ id: string; currentOperationId?: string; currentAssetId?: string; lastSeen: Date }> }) => {
+      socket.on('users:list', async (data: { users: Array<{ id: string; currentOperationId?: string; currentAssetId?: string; lastSeen: Date | string | number }> }>) => {
         // Filter out current user
         const otherUsers = data.users.filter(u => u.id !== user?.id);
+        
+        // Helper function to safely convert lastSeen to Date
+        const safeDate = (value: Date | string | number | undefined): Date => {
+          if (!value) return new Date();
+          if (value instanceof Date) return value;
+          if (typeof value === 'string' || typeof value === 'number') {
+            const date = new Date(value);
+            return isNaN(date.getTime()) ? new Date() : date;
+          }
+          return new Date();
+        };
         
         // Fetch full user details for each online user
         const USE_API = import.meta.env.VITE_USE_API === 'true' || import.meta.env.VITE_API_URL;
@@ -137,32 +148,34 @@ export const OnlineUsersProvider: React.FC<{ children: ReactNode }> = ({ childre
                 const response = await apiClient.getUser(userData.id);
                 const userInfo = response.user;
                 usersWithDetails.push({
-                  id: userInfo.id,
-                  name: userInfo.name,
-                  email: userInfo.email,
-                  avatarUrl: userInfo.avatarUrl,
-                  role: userInfo.role,
-                  currentOperationId: userData.currentOperationId,
-                  currentAssetId: userData.currentAssetId,
-                  lastSeen: new Date(userData.lastSeen)
+                  id: String(userInfo.id || userData.id),
+                  name: String(userInfo.name || `User ${userData.id.slice(0, 8)}`),
+                  email: String(userInfo.email || ''),
+                  avatarUrl: userInfo.avatarUrl ? String(userInfo.avatarUrl) : undefined,
+                  role: String(userInfo.role || 'Analyst'),
+                  currentOperationId: userData.currentOperationId ? String(userData.currentOperationId) : undefined,
+                  currentAssetId: userData.currentAssetId ? String(userData.currentAssetId) : undefined,
+                  lastSeen: safeDate(userData.lastSeen)
                 });
                 continue;
               } catch (err) {
+                logger.warn('Error fetching user details:', err);
                 // Fallback
               }
             }
             
             // Fallback
             usersWithDetails.push({
-              id: userData.id,
-              name: `User ${userData.id.slice(0, 8)}`,
+              id: String(userData.id),
+              name: `User ${String(userData.id).slice(0, 8)}`,
               email: '',
               role: 'Analyst',
-              currentOperationId: userData.currentOperationId,
-              currentAssetId: userData.currentAssetId,
-              lastSeen: new Date(userData.lastSeen)
+              currentOperationId: userData.currentOperationId ? String(userData.currentOperationId) : undefined,
+              currentAssetId: userData.currentAssetId ? String(userData.currentAssetId) : undefined,
+              lastSeen: safeDate(userData.lastSeen)
             });
           } catch (err) {
+            logger.warn('Error processing user data:', err);
             // Skip this user
           }
         }
