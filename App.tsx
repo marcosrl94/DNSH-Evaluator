@@ -12,6 +12,7 @@ import { AssetDnshEvaluation, Operation, DnshObjective } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
 import { logger } from './utils/logger';
 import { getAllOperations, dataStore, updateAssetEvaluation, updateOperation as updateOperationInStore } from './services/dataManagement';
+import { socketService } from './src/services/socketService';
 import PalantirLoader from './components/PalantirLoader';
 import { AppSidebar } from './components/AppSidebar';
 import { AppHeader } from './components/AppHeader';
@@ -87,7 +88,6 @@ const AuthenticatedApp: React.FC = () => {
 
   // Update user presence when navigating
   useEffect(() => {
-    const { socketService } = require('./src/services/socketService');
     if (socketService.isConnected()) {
       socketService.updatePresence(selectedOperationId || undefined, selectedAssetId || undefined);
       
