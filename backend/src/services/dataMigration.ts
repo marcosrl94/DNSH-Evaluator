@@ -3,7 +3,6 @@
  * Migrate data from frontend localStorage/demo data to database
  */
 
-import { PoolClient } from 'pg';
 import { getPool } from '../config/database';
 import { logger } from '../utils/logger';
 
@@ -27,20 +26,16 @@ export async function migrateDemoData(): Promise<void> {
       "SELECT id FROM users WHERE email = 'admin@ecoinvest.com'"
     );
 
-    let adminUserId: string;
     if (adminUsers.rows.length === 0) {
       const bcrypt = require('bcrypt');
       const passwordHash = await bcrypt.hash('admin123', 10);
-      const result = await client.query<{ id: string }>(
+      await client.query(
         `INSERT INTO users (email, password_hash, name, role, auth_provider)
          VALUES ('admin@ecoinvest.com', $1, 'Admin User', 'Admin', 'local')
          RETURNING id`,
         [passwordHash]
       );
-      adminUserId = result.rows[0].id;
       logger.info('Created admin user');
-    } else {
-      adminUserId = adminUsers.rows[0].id;
     }
 
     // Note: DEMO_OPERATIONS and DEMO_CLIENTS would need to be imported

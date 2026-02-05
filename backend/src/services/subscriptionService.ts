@@ -3,7 +3,7 @@
  * Handles subscription management, plan limits, and usage tracking
  */
 
-import { query, transaction } from '../config/database';
+import { query } from '../config/database';
 import { logger } from '../utils/logger';
 
 export interface PlanLimits {

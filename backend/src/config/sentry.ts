@@ -17,7 +17,7 @@ export const initSentry = () => {
         dsn: process.env.SENTRY_DSN,
         environment: process.env.NODE_ENV || 'development',
         tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-        beforeSend(event, hint) {
+        beforeSend(event: any, hint: any) {
           // Filter out sensitive data
           if (event.request) {
             delete event.request.headers?.authorization;

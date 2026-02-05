@@ -3,12 +3,11 @@
  * Manage organizations (tenants)
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { query, transaction } from '../config/database';
 import { authenticate } from '../middleware/auth';
-import { enforceOrganizationIsolation, getUserOrganization } from '../middleware/organizationIsolation';
-import { createError } from '../middleware/errorHandler';
+import { enforceOrganizationIsolation } from '../middleware/organizationIsolation';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -58,13 +57,13 @@ router.get('/current', enforceOrganizationIsolation, async (req: any, res: Respo
       [organizationId]
     );
 
-    res.json({
+    return res.json({
       organization: orgs[0],
       members,
     });
   } catch (error: any) {
     logger.error('Get current organization error:', error);
-    res.status(500).json({ error: 'Failed to fetch organization' });
+    return res.status(500).json({ error: 'Failed to fetch organization' });
   }
 });
 
@@ -97,46 +96,45 @@ router.post(
         return res.status(400).json({ error: 'Organization slug already exists' });
       }
 
-      await transaction(async (client) => {
+      const organizationId = await transaction(async (client) => {
         // Create organization
-        const orgs = await query<{ id: string }>(
+        const orgResult = await client.query<{ id: string }>(
           `INSERT INTO organizations (name, slug, domain, created_by, subscription_plan, subscription_status)
            VALUES ($1, $2, $3, $4, 'free', 'active')
            RETURNING id`,
-          [name, orgSlug, domain || null, userId],
-          client
+          [name, orgSlug, domain || null, userId]
         );
 
-        if (orgs.length === 0) {
-          throw createError('Failed to create organization', 500);
+        if (orgResult.rows.length === 0) {
+          throw new Error('Failed to create organization');
         }
 
-        const organizationId = orgs[0].id;
+        const orgId = orgResult.rows[0].id;
 
         // Add creator as owner
-        await query(
+        await client.query(
           `INSERT INTO user_organizations (user_id, organization_id, role)
            VALUES ($1, $2, 'Owner')`,
-          [userId, organizationId],
-          client
+          [userId, orgId]
         );
 
         // Set as user's default organization
-        await query(
+        await client.query(
           'UPDATE users SET default_organization_id = $1 WHERE id = $2',
-          [organizationId, userId],
-          client
+          [orgId, userId]
         );
 
-        res.status(201).json({
-          id: organizationId,
-          slug: orgSlug,
-          message: 'Organization created successfully',
-        });
+        return orgId;
+      });
+
+      return res.status(201).json({
+        id: organizationId,
+        slug: orgSlug,
+        message: 'Organization created successfully',
       });
     } catch (error: any) {
       logger.error('Create organization error:', error);
-      res.status(500).json({ error: 'Failed to create organization' });
+      return res.status(500).json({ error: 'Failed to create organization' });
     }
   }
 );
@@ -155,7 +153,7 @@ router.put(
   enforceOrganizationIsolation,
   async (req: any, res: Response) => {
     try {
-      const { id } = req.params;
+      const { id: _id } = req.params;
       const organizationId = req.organizationId;
 
       // Verify user has permission (owner or admin)
@@ -203,17 +201,17 @@ router.put(
       }
 
       updateFields.push(`updated_at = NOW()`);
-      updateValues.push(id);
+      updateValues.push(organizationId);
 
       await query(
         `UPDATE organizations SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
         updateValues
       );
 
-      res.json({ message: 'Organization updated successfully' });
+      return res.json({ message: 'Organization updated successfully' });
     } catch (error: any) {
       logger.error('Update organization error:', error);
-      res.status(500).json({ error: 'Failed to update organization' });
+      return res.status(500).json({ error: 'Failed to update organization' });
     }
   }
 );
@@ -236,7 +234,7 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { id } = req.params;
+      const { id: _id } = req.params;
       const organizationId = req.organizationId;
       const { userId: newUserId, role = 'Member' } = req.body;
 
@@ -267,10 +265,10 @@ router.post(
         [newUserId, organizationId, role]
       );
 
-      res.status(201).json({ message: 'Member added successfully' });
+      return res.status(201).json({ message: 'Member added successfully' });
     } catch (error: any) {
       logger.error('Add member error:', error);
-      res.status(500).json({ error: 'Failed to add member' });
+      return res.status(500).json({ error: 'Failed to add member' });
     }
   }
 );
@@ -281,7 +279,7 @@ router.post(
  */
 router.delete('/:id/members/:userId', enforceOrganizationIsolation, async (req: any, res: Response) => {
   try {
-    const { id, userId: targetUserId } = req.params;
+    const { id: _id, userId: targetUserId } = req.params;
     const organizationId = req.organizationId;
 
     // Cannot remove yourself
@@ -305,10 +303,10 @@ router.delete('/:id/members/:userId', enforceOrganizationIsolation, async (req: 
       [targetUserId, organizationId]
     );
 
-    res.json({ message: 'Member removed successfully' });
+    return res.json({ message: 'Member removed successfully' });
   } catch (error: any) {
     logger.error('Remove member error:', error);
-    res.status(500).json({ error: 'Failed to remove member' });
+    return res.status(500).json({ error: 'Failed to remove member' });
   }
 });
 

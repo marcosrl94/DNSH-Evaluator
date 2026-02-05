@@ -205,7 +205,7 @@ router.put('/:id/resolve', async (req: any, res: Response) => {
     );
 
     // Emit real-time update
-    emitToOperation(io, comment.operation_id, 'comment:resolved', { commentId: id });
+    emitToOperation(comment.operation_id, 'comment:resolved', { commentId: id });
 
     res.json({ message: 'Comment resolved' });
   } catch (error: any) {

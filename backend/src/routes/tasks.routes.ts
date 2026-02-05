@@ -3,11 +3,10 @@
  * Manage task assignments and tracking
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { query } from '../config/database';
 import { authenticate, checkOperationPermission } from '../middleware/auth';
-import { createError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import { emitToUser, emitToOperation } from '../config/socketio';
 
@@ -63,10 +62,10 @@ router.get('/', async (req: any, res: Response) => {
 
     const tasks = await query(sql, params);
 
-    res.json({ tasks });
+    return res.json({ tasks });
   } catch (error: any) {
     logger.error('Get tasks error:', error);
-    res.status(500).json({ error: 'Failed to fetch tasks' });
+    return res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 });
 
@@ -127,7 +126,7 @@ router.post(
       );
 
       if (result.length === 0) {
-        throw createError('Failed to create task', 500);
+        return res.status(500).json({ error: 'Failed to create task' });
       }
 
       const taskId = result[0].id;
@@ -145,13 +144,13 @@ router.post(
       );
 
       // Emit real-time update
-      emitToUser(io, assignedTo, 'task:assigned', { taskId });
-      emitToOperation(io, operationId, 'task:created', { taskId });
+      emitToUser(assignedTo, 'task:assigned', { taskId });
+      emitToOperation(operationId, 'task:created', { taskId });
 
-      res.status(201).json({ id: taskId, message: 'Task created successfully' });
+      return res.status(201).json({ id: taskId, message: 'Task created successfully' });
     } catch (error: any) {
       logger.error('Create task error:', error);
-      res.status(500).json({ error: 'Failed to create task' });
+      return res.status(500).json({ error: 'Failed to create task' });
     }
   }
 );
@@ -223,10 +222,10 @@ router.put(
       emitToUser(task.assigned_to, 'task:updated', { taskId: id, status });
       emitToOperation(task.operation_id, 'task:updated', { taskId: id });
 
-      res.json({ message: 'Task status updated' });
+      return res.json({ message: 'Task status updated' });
     } catch (error: any) {
       logger.error('Update task error:', error);
-      res.status(500).json({ error: 'Failed to update task' });
+      return res.status(500).json({ error: 'Failed to update task' });
     }
   }
 );
@@ -260,10 +259,10 @@ router.delete('/:id', async (req: any, res: Response) => {
     // Emit real-time update
     emitToOperation(task.operation_id, 'task:deleted', { taskId: id });
 
-    res.json({ message: 'Task deleted' });
+    return res.json({ message: 'Task deleted' });
   } catch (error: any) {
     logger.error('Delete task error:', error);
-    res.status(500).json({ error: 'Failed to delete task' });
+    return res.status(500).json({ error: 'Failed to delete task' });
   }
 });
 

@@ -3,7 +3,8 @@
  * Handle file uploads, downloads, and deletions
  */
 
-import AWS from 'aws-sdk';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const AWS = require('aws-sdk');
 import { logger } from '../utils/logger';
 
 // Configure AWS S3
@@ -23,8 +24,8 @@ export async function uploadToS3(
   key: string,
   contentType: string
 ): Promise<string> {
-  try {
-    const params: AWS.S3.PutObjectRequest = {
+  return new Promise((resolve, reject) => {
+    const params = {
       Bucket: BUCKET_NAME,
       Key: key,
       Body: buffer,
@@ -32,36 +33,44 @@ export async function uploadToS3(
       ACL: 'private' // Files are private by default
     };
 
-    const result = await s3.upload(params).promise();
-    return result.Location;
-  } catch (error: any) {
-    logger.error('S3 upload error:', error);
-    throw new Error('Failed to upload file to S3');
-  }
+    s3.upload(params, (err: any, data: any) => {
+      if (err) {
+        logger.error('S3 upload error:', err);
+        reject(new Error('Failed to upload file to S3'));
+      } else {
+        resolve(data.Location);
+      }
+    });
+  });
 }
 
 /**
  * Delete file from S3
  */
 export async function deleteFromS3(fileUrl: string): Promise<void> {
-  try {
+  return new Promise((resolve, reject) => {
     // Extract key from URL
     const key = fileUrl.split('.com/')[1] || fileUrl.split('amazonaws.com/')[1];
     
     if (!key) {
-      throw new Error('Invalid file URL');
+      reject(new Error('Invalid file URL'));
+      return;
     }
 
-    const params: AWS.S3.DeleteObjectRequest = {
+    const params = {
       Bucket: BUCKET_NAME,
       Key: key
     };
 
-    await s3.deleteObject(params).promise();
-  } catch (error: any) {
-    logger.error('S3 delete error:', error);
-    throw new Error('Failed to delete file from S3');
-  }
+    s3.deleteObject(params, (err: any) => {
+      if (err) {
+        logger.error('S3 delete error:', err);
+        reject(new Error('Failed to delete file from S3'));
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 /**
@@ -82,7 +91,12 @@ export async function getSignedUrl(fileUrl: string, expiresIn: number = 3600): P
       Expires: expiresIn
     };
 
-    return s3.getSignedUrlPromise('getObject', params);
+    return new Promise((resolve, reject) => {
+      s3.getSignedUrl('getObject', params, (err: any, url: string) => {
+        if (err) reject(err);
+        else resolve(url);
+      });
+    });
   } catch (error: any) {
     logger.error('S3 signed URL error:', error);
     throw new Error('Failed to generate download URL');

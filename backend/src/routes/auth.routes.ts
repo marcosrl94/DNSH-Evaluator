@@ -17,9 +17,9 @@ const router = Router();
 
 // Apply rate limiting to auth routes
 router.use(authRateLimiter);
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
+const JWT_SECRET: string = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '24h';
+const JWT_REFRESH_EXPIRES_IN: string = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
 
 /**
  * @swagger
@@ -109,16 +109,16 @@ router.post(
         throw createError('Failed to create user', 500);
       }
 
-      const user = users[0];
+      const user = users[0] as { id: string; email: string; name: string; role: string; is_active?: boolean; password_hash?: string };
 
       // Generate tokens
-      const token = jwt.sign(
+      const token = (jwt.sign as any)(
         { userId: user.id, email: user.email },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
       );
 
-      const refreshToken = jwt.sign(
+      const refreshToken = (jwt.sign as any)(
         { userId: user.id, type: 'refresh' },
         JWT_SECRET,
         { expiresIn: JWT_REFRESH_EXPIRES_IN }
@@ -142,7 +142,7 @@ router.post(
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role
+          role: (user as any).role || 'User'
         },
         token,
         refreshToken
@@ -214,7 +214,7 @@ router.post(
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      const user = users[0];
+      const user = users[0] as { id: string; email: string; name: string; role: string; is_active?: boolean; password_hash?: string };
 
       if (!user.is_active) {
         return res.status(403).json({ error: 'Account is inactive' });
@@ -227,13 +227,13 @@ router.post(
       }
 
       // Generate tokens
-      const token = jwt.sign(
+      const token = (jwt.sign as any)(
         { userId: user.id, email: user.email },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
       );
 
-      const refreshToken = jwt.sign(
+      const refreshToken = (jwt.sign as any)(
         { userId: user.id, type: 'refresh' },
         JWT_SECRET,
         { expiresIn: JWT_REFRESH_EXPIRES_IN }
@@ -257,7 +257,7 @@ router.post(
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role
+          role: (user as any).role || 'User'
         },
         token,
         refreshToken
@@ -343,10 +343,10 @@ router.post(
         return res.status(401).json({ error: 'User not found' });
       }
 
-      const user = users[0];
+      const user = users[0] as { id: string; email: string; name: string; role: string; is_active?: boolean; password_hash?: string };
 
       // Generate new access token
-      const newToken = jwt.sign(
+      const newToken = (jwt.sign as any)(
         { userId: user.id, email: user.email },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
@@ -532,7 +532,7 @@ router.post(
       let user;
       if (existingUsers.length === 0) {
         // Create new user from Google
-        const newUsers = await query<{ id: string }>(
+        const newUsers = await query<{ id: string; email: string; name: string; role: string }>(
           `INSERT INTO users (email, name, auth_provider, provider_id, role, avatar_url)
            VALUES ($1, $2, 'google', $3, 'Evaluator', $4)
            RETURNING id, email, name, role`,
@@ -548,10 +548,10 @@ router.post(
           throw createError('Failed to create user', 500);
         }
 
-        user = newUsers[0];
+        user = newUsers[0] as { id: string; email: string; name: string; role: string; is_active?: boolean };
         logger.info(`New Google user created: ${decoded.email}`);
       } else {
-        user = existingUsers[0];
+        user = existingUsers[0] as { id: string; email: string; name: string; role: string; is_active?: boolean };
 
         if (!user.is_active) {
           return res.status(403).json({ error: 'Account is inactive' });
@@ -569,13 +569,13 @@ router.post(
       }
 
       // Generate tokens (same as login)
-      const token = jwt.sign(
+      const token = (jwt.sign as any)(
         { userId: user.id, email: user.email },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
       );
 
-      const refreshToken = jwt.sign(
+      const refreshToken = (jwt.sign as any)(
         { userId: user.id, type: 'refresh' },
         JWT_SECRET,
         { expiresIn: JWT_REFRESH_EXPIRES_IN }
@@ -596,7 +596,7 @@ router.post(
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role
+          role: (user as any).role || 'User'
         },
         token,
         refreshToken

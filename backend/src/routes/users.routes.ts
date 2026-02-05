@@ -3,11 +3,10 @@
  * User management and permissions
  */
 
-import { Router, Request, Response } from 'express';
-import { body, validationResult } from 'express-validator';
+import { Router, Response } from 'express';
+import { body } from 'express-validator';
 import { query } from '../config/database';
 import { authenticate, authorize } from '../middleware/auth';
-import { createError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -18,7 +17,7 @@ router.use(authenticate as any);
  * GET /users
  * Get all users (admin only)
  */
-router.get('/', authorize('Admin'), async (req: any, res: Response) => {
+router.get('/', authorize('Admin'), async (_req: any, res: Response) => {
   try {
     const users = await query(
       `SELECT id, email, name, role, is_active, last_login_at, created_at
@@ -57,10 +56,10 @@ router.get('/:id', async (req: any, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user: users[0] });
+    return res.json({ user: users[0] });
   } catch (error: any) {
     logger.error('Get user error:', error);
-    res.status(500).json({ error: 'Failed to fetch user' });
+    return res.status(500).json({ error: 'Failed to fetch user' });
   }
 });
 

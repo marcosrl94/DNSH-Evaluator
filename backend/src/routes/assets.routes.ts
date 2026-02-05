@@ -154,7 +154,7 @@ router.post(
       });
 
       // Emit real-time update
-      emitToOperation(io, operationId, 'asset:created', { assetId: result });
+      emitToOperation(operationId, 'asset:created', { assetId: result });
 
       res.status(201).json({ id: result, message: 'Asset created successfully' });
     } catch (error: any) {

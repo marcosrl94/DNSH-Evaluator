@@ -124,7 +124,7 @@ router.post(
       );
 
       // Emit real-time update
-      emitToOperation(io, operationId, 'evidence:uploaded', { evidenceId, operationId });
+      emitToOperation(operationId, 'evidence:uploaded', { evidenceId, operationId });
 
       res.status(201).json({
         id: evidenceId,

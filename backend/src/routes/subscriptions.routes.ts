@@ -8,10 +8,8 @@ import { body, validationResult, query as queryValidator } from 'express-validat
 import { query } from '../config/database';
 import { authenticate } from '../middleware/auth';
 import { enforceOrganizationIsolation } from '../middleware/organizationIsolation';
-import { createError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import {
-  getPlanLimits,
   getCurrentUsage,
   checkLimit,
   getOrganizationSubscription,
@@ -27,16 +25,16 @@ router.use(enforceOrganizationIsolation);
  * GET /subscriptions/plans
  * Get available subscription plans
  */
-router.get('/plans', async (req: Request, res: Response) => {
+router.get('/plans', async (_req: Request, res: Response) => {
   try {
     const plans = await query(
       'SELECT plan, max_operations, max_users, max_storage_gb, max_api_calls_per_month, features FROM plan_limits ORDER BY max_operations ASC'
     );
 
-    res.json({ plans });
+    return res.json({ plans });
   } catch (error: any) {
     logger.error('Get plans error:', error);
-    res.status(500).json({ error: 'Failed to fetch plans' });
+    return res.status(500).json({ error: 'Failed to fetch plans' });
   }
 });
 
@@ -58,10 +56,10 @@ router.get('/current', async (req: any, res: Response) => {
       return res.status(404).json({ error: 'Subscription not found' });
     }
 
-    res.json(subscription);
+    return res.json(subscription);
   } catch (error: any) {
     logger.error('Get current subscription error:', error);
-    res.status(500).json({ error: 'Failed to fetch subscription' });
+    return res.status(500).json({ error: 'Failed to fetch subscription' });
   }
 });
 
@@ -80,13 +78,13 @@ router.get('/usage', async (req: any, res: Response) => {
     const usage = await getCurrentUsage(organizationId);
     const subscription = await getOrganizationSubscription(organizationId);
 
-    res.json({
+    return res.json({
       usage,
       limits: subscription?.limits,
     });
   } catch (error: any) {
     logger.error('Get usage error:', error);
-    res.status(500).json({ error: 'Failed to fetch usage' });
+    return res.status(500).json({ error: 'Failed to fetch usage' });
   }
 });
 
@@ -116,10 +114,10 @@ router.post(
 
       const result = await checkLimit(organizationId, limitType, value);
 
-      res.json(result);
+      return res.json(result);
     } catch (error: any) {
       logger.error('Check limit error:', error);
-      res.status(500).json({ error: 'Failed to check limit' });
+      return res.status(500).json({ error: 'Failed to check limit' });
     }
   }
 );
@@ -160,7 +158,7 @@ router.get(
       );
       const total = parseInt(countResult[0].total);
 
-      res.json({
+      return res.json({
         invoices,
         pagination: {
           page,
@@ -171,7 +169,7 @@ router.get(
       });
     } catch (error: any) {
       logger.error('Get invoices error:', error);
-      res.status(500).json({ error: 'Failed to fetch invoices' });
+      return res.status(500).json({ error: 'Failed to fetch invoices' });
     }
   }
 );
@@ -201,13 +199,13 @@ router.post(
       // For now, return a mock checkout URL
       const checkoutUrl = process.env.STRIPE_CHECKOUT_URL || `https://checkout.stripe.com/mock-${plan}`;
 
-      res.json({
+      return res.json({
         checkoutUrl,
         message: 'Redirect to checkout to complete upgrade',
       });
     } catch (error: any) {
       logger.error('Upgrade subscription error:', error);
-      res.status(500).json({ error: 'Failed to initiate upgrade' });
+      return res.status(500).json({ error: 'Failed to initiate upgrade' });
     }
   }
 );
