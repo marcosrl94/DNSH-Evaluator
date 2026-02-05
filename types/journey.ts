@@ -40,18 +40,18 @@ export const JOURNEY_STAGES: StageMetadata[] = [
   },
   {
     stage: JourneyStage.AUTOMATED_EVALUATION,
-    label: 'EVAL_AUTOMATIZADA',
-    description: 'Evaluación automatizada en base a datos y soportes',
+    label: 'EVAL_DNSH',
+    description: 'Evaluación DNSH automatizada y datos manuales',
     icon: 'Zap',
     order: 2,
     requiredFields: ['climateData', 'hazardData', 'evidence']
   },
   {
     stage: JourneyStage.MANUAL_DATA_ENTRY,
-    label: 'DATOS_MANUALES',
-    description: 'Inserción de datos manuales pendientes',
-    icon: 'Edit',
-    order: 3,
+    label: 'EVAL_DNSH',
+    description: 'Evaluación DNSH automatizada y datos manuales',
+    icon: 'Zap',
+    order: 2,
     requiredFields: ['evaluations', 'justifications']
   },
   {

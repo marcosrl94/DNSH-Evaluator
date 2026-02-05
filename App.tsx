@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
-import { Shield } from 'lucide-react';
+import { Shield, AlertTriangle } from 'lucide-react';
 import { DEMO_OPERATIONS, DEMO_CLIENTS } from './constants';
 import { Client } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -313,7 +313,33 @@ const AuthenticatedApp: React.FC = () => {
           </Suspense>
         );
       case 'client-detail':
-        return selectedClient ? (
+        if (!selectedClient) {
+          // No client selected, redirect to operation list
+          return (
+            <div className={`flex flex-col items-center justify-center h-full p-8 transition-colors ${
+              theme === 'dark' ? 'bg-black text-white' : 'bg-white text-gray-900'
+            }`}>
+              <AlertTriangle className={`w-16 h-16 mb-4 ${theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'}`} />
+              <h2 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Cliente no encontrado
+              </h2>
+              <p className={`mb-6 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                El cliente seleccionado no está disponible. Por favor, selecciona otro cliente.
+              </p>
+              <button
+                onClick={() => setCurrentView('operation-list')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-[#00ff88] text-black hover:bg-[#00cc6f]'
+                    : 'bg-[#0066cc] text-white hover:bg-[#0052a3]'
+                }`}
+              >
+                Ir a lista de operaciones
+              </button>
+            </div>
+          );
+        }
+        return (
           <Suspense fallback={<LoadingFallback />}>
             <ClientDetailPage 
               client={selectedClient}
@@ -323,7 +349,7 @@ const AuthenticatedApp: React.FC = () => {
               onBack={() => navigateToClient('')}
             />
           </Suspense>
-        ) : <div className="p-8">Cliente no encontrado</div>;
+        );
       // client-dnsh-evaluation removed - unified in dnsh-evaluation
       // All DNSH evaluations now go through DnshEvaluationEnhancedPage
       case 'map-viewer':
@@ -363,7 +389,33 @@ const AuthenticatedApp: React.FC = () => {
           </Suspense>
         );
       case 'operation-detail':
-        return selectedOperation ? (
+        if (!selectedOperation) {
+          // No operation selected, redirect to operation list
+          return (
+            <div className={`flex flex-col items-center justify-center h-full p-8 transition-colors ${
+              theme === 'dark' ? 'bg-black text-white' : 'bg-white text-gray-900'
+            }`}>
+              <AlertTriangle className={`w-16 h-16 mb-4 ${theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'}`} />
+              <h2 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Operación no encontrada
+              </h2>
+              <p className={`mb-6 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                La operación seleccionada no está disponible. Por favor, selecciona otra operación.
+              </p>
+              <button
+                onClick={() => setCurrentView('operation-list')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-[#00ff88] text-black hover:bg-[#00cc6f]'
+                    : 'bg-[#0066cc] text-white hover:bg-[#0052a3]'
+                }`}
+              >
+                Ir a lista de operaciones
+              </button>
+            </div>
+          );
+        }
+        return (
           <Suspense fallback={<LoadingFallback />}>
             <OperationDetailPage 
               operation={selectedOperation} 
@@ -374,9 +426,35 @@ const AuthenticatedApp: React.FC = () => {
               onUpdateOperation={handleUpdateOperation}
             />
           </Suspense>
-        ) : <div>Operation not found</div>;
+        );
       case 'dnsh-evaluation':
-        return selectedOperation ? (
+        if (!selectedOperation) {
+          // No operation selected, redirect to operation list
+          return (
+            <div className={`flex flex-col items-center justify-center h-full p-8 transition-colors ${
+              theme === 'dark' ? 'bg-black text-white' : 'bg-white text-gray-900'
+            }`}>
+              <AlertTriangle className={`w-16 h-16 mb-4 ${theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'}`} />
+              <h2 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Operación no seleccionada
+              </h2>
+              <p className={`mb-6 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                Por favor, selecciona una operación para continuar con la evaluación DNSH.
+              </p>
+              <button
+                onClick={() => setCurrentView('operation-list')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-[#00ff88] text-black hover:bg-[#00cc6f]'
+                    : 'bg-[#0066cc] text-white hover:bg-[#0052a3]'
+                }`}
+              >
+                Ir a lista de operaciones
+              </button>
+            </div>
+          );
+        }
+        return (
           <Suspense fallback={<LoadingFallback />}>
             <DnshEvaluationEnhancedPage 
               operation={selectedOperation} 
@@ -385,7 +463,7 @@ const AuthenticatedApp: React.FC = () => {
               initialAssetId={selectedAssetId}
             />
           </Suspense>
-        ) : <div>Operation not found</div>;
+        );
       default:
         return (
           <Suspense fallback={<LoadingFallback />}>
@@ -425,6 +503,8 @@ const AuthenticatedApp: React.FC = () => {
         setSelectedOperationId={setSelectedOperationId}
         setSelectedClientId={setSelectedClientId}
         setSelectedAssetId={setSelectedAssetId}
+        selectedOperationId={selectedOperationId}
+        selectedAssetId={selectedAssetId}
         theme={theme}
         user={user}
         logout={logout}

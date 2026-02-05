@@ -13,16 +13,16 @@ import { validateDnshStatus } from './dnshValidation';
 /**
  * Get objective status for an asset
  * This is the SINGLE SOURCE OF TRUTH for asset-level DNSH status
+ * CONSIDERS: Substantial contribution exemption
  */
 export const getAssetObjectiveStatus = (
   asset: Asset,
-  objective: DnshObjective
+  objective: DnshObjective,
+  operationSubstantialContribution?: DnshObjective
 ): 'Compliant' | 'Non-Compliant' | 'Conditional' | 'Not Assessed' => {
-  if (!asset.dnshEvaluation) {
-    return 'Not Assessed';
-  }
-  
-  return getObjectiveStatusFromAsset(asset.dnshEvaluation, objective);
+  // getObjectiveStatusFromAsset already handles substantial contribution check first,
+  // so we can just pass it through
+  return getObjectiveStatusFromAsset(asset.dnshEvaluation, objective, asset, operationSubstantialContribution);
 };
 
 /**

@@ -56,7 +56,9 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
         setRecommendedProvider(null);
       }
     } catch (error) {
-      console.error('Error initializing AI provider selector:', error);
+      // Safely convert error to string
+      const errorMsg = error instanceof Error ? error.message : String(error || 'Unknown error');
+      console.error('Error initializing AI provider selector:', errorMsg);
       setAvailableProviders([]);
       setRecommendedProvider(null);
     }
@@ -97,7 +99,9 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
               </option>
             );
           } catch (error) {
-            console.error(`Error rendering provider ${provider}:`, error);
+            // Safely convert error to string
+            const errorMsg = error instanceof Error ? error.message : String(error || 'Unknown error');
+            console.error(`Error rendering provider ${String(provider)}:`, errorMsg);
             return null;
           }
         }).filter(Boolean) : null}

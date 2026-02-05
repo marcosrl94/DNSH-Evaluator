@@ -3,6 +3,8 @@ import React, { useState, useRef } from 'react';
 import { Upload, FileText, Download, Trash2, Plus, Search, Filter, Calendar, User, Tag, Link as LinkIcon, X, Sparkles, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { EvidenceDocument, EvidenceType, Operation, DnshObjective } from '../types';
 import { processDocument, createEvidenceFromProcessed, ProcessedDocumentData } from '../services/documentProcessor';
+import { useTheme } from '../context/ThemeContext';
+import { getThemeClasses } from '../utils/themeUtils';
 
 interface Props {
   operation: Operation;
@@ -17,6 +19,8 @@ const EvidenceRegistry: React.FC<Props> = ({
   onDeleteEvidence,
   onLinkToQuestion 
 }) => {
+  const { theme } = useTheme();
+  const themeClasses = getThemeClasses(theme || 'dark');
   const [isAdding, setIsAdding] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<EvidenceType | 'All'>('All');
@@ -60,47 +64,47 @@ const EvidenceRegistry: React.FC<Props> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-full">
+    <div className={`${themeClasses.card.bg} rounded-xl shadow-sm border ${themeClasses.card.border} flex flex-col h-full`}>
       {/* Header */}
-      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div className={`p-4 border-b ${themeClasses.border.default} ${themeClasses.bg.secondary} flex items-center justify-between`}>
         <div>
-          <h3 className="font-semibold text-slate-800">Registro de Evidencias</h3>
-          <p className="text-xs text-slate-500 mt-1">
-            {documents.length} documento{documents.length !== 1 ? 's' : ''} registrado{documents.length !== 1 ? 's' : ''}
+          <h3 className={`font-semibold font-mono uppercase tracking-wider ${themeClasses.text.primary}`}>REGISTRO_DE_EVIDENCIAS</h3>
+          <p className={`text-xs font-mono mt-1 ${themeClasses.text.tertiary}`}>
+            {documents.length} DOCUMENTO{documents.length !== 1 ? 'S' : ''} REGISTRADO{documents.length !== 1 ? 'S' : ''}
           </p>
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+          className={`flex items-center px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all ${themeClasses.button.primary}`}
         >
-          <Plus size={16} className="mr-1" />
-          Añadir Evidencia
+          <Plus size={14} className="mr-1" />
+          AÑADIR_EVIDENCIA
         </button>
       </div>
 
       {/* Add Form */}
       {showAddForm && (
-        <div className="p-4 border-b border-slate-200 bg-emerald-50/30">
+        <div className={`p-4 border-b ${themeClasses.border.default} ${themeClasses.bg.tertiary}`}>
           <form onSubmit={handleAddEvidence} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Nombre del Documento *</label>
+                <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>NOMBRE_DOC *</label>
                 <input
                   type="text"
                   name="name"
                   required
                   defaultValue={processedData?.title || ''}
-                  className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
-                  placeholder="Ej: TDD - Iberia Solar PV"
+                  className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
+                  placeholder="TDD_Iberia_Solar_PV"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Tipo de Evidencia *</label>
+                <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>TIPO_EVIDENCIA *</label>
                 <select
                   name="type"
                   required
                   defaultValue={processedData?.documentType || ''}
-                  className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
+                  className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
                 >
                   {Object.values(EvidenceType).map(type => (
                     <option key={type} value={type}>{type}</option>
@@ -110,85 +114,85 @@ const EvidenceRegistry: React.FC<Props> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Descripción</label>
+              <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>DESCRIPCION</label>
               <textarea
                 name="description"
                 rows={2}
                 defaultValue={processedData?.description || ''}
-                className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
-                placeholder="Descripción del documento..."
+                className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
+                placeholder="DESCRIPCION_DEL_DOCUMENTO..."
               />
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">URL del Documento</label>
+                <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>URL_DOC</label>
                 <input
                   type="url"
                   name="fileUrl"
-                  className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
-                  placeholder="https://..."
+                  className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
+                  placeholder="HTTPS://..."
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Fecha del Documento</label>
+                <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>FECHA_DOC</label>
                 <input
                   type="date"
                   name="documentDate"
                   defaultValue={processedData?.documentDate || ''}
-                  className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
+                  className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Autor/Organización</label>
+                <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>AUTOR</label>
                 <input
                   type="text"
                   name="author"
                   defaultValue={processedData?.author || ''}
-                  className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
-                  placeholder="Ej: Consultora XYZ"
+                  className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
+                  placeholder="CONSULTORA_XYZ"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Objetivo DNSH Relacionado</label>
+                <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>OBJETIVO_DNSH</label>
                 <select
                   name="relatedObjective"
                   defaultValue={processedData?.relatedObjectives?.[0] || ''}
-                  className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
+                  className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
                 >
-                  <option value="">Ninguno</option>
+                  <option value="">NINGUNO</option>
                   {Object.values(DnshObjective).map(obj => (
                     <option key={obj} value={obj}>{obj}</option>
                   ))}
                 </select>
                 {processedData?.relatedObjectives && processedData.relatedObjectives.length > 1 && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    También detectados: {processedData.relatedObjectives.slice(1).map(o => o.split(' ')[0]).join(', ')}
+                  <p className={`text-xs font-mono mt-1 ${themeClasses.text.tertiary}`}>
+                    TAMBIEN_DETECTADOS: {processedData.relatedObjectives.slice(1).map(o => o.split(' ')[0]).join(', ')}
                   </p>
                 )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Tags (separados por comas)</label>
+                <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>TAGS (SEP_COMAS)</label>
                 <input
                   type="text"
                   name="tags"
                   defaultValue={processedData?.suggestedTags?.join(', ') || ''}
-                  className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
-                  placeholder="TDD, EIA, Climate Risk"
+                  className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
+                  placeholder="TDD, EIA, CLIMATE_RISK"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Subido por</label>
+              <label className={`block text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary} mb-1`}>SUBIDO_POR</label>
               <input
                 type="text"
                 name="uploadedBy"
-                defaultValue={processedData ? 'System (Auto-processed)' : 'Current User'}
-                className="w-full text-sm border-slate-300 rounded-md focus:border-emerald-500 focus:ring-emerald-500 p-2"
+                defaultValue={processedData ? 'SYSTEM_AUTO_PROCESSED' : 'CURRENT_USER'}
+                className={`w-full text-sm rounded-md p-2 font-mono ${themeClasses.inputClass}`}
               />
             </div>
 
@@ -196,15 +200,15 @@ const EvidenceRegistry: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-lg transition-all ${themeClasses.button.secondary}`}
               >
-                Cancelar
+                CANCELAR
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-lg transition-all ${themeClasses.button.primary}`}
               >
-                Registrar Evidencia
+                REGISTRAR_EVIDENCIA
               </button>
             </div>
           </form>
@@ -212,27 +216,27 @@ const EvidenceRegistry: React.FC<Props> = ({
       )}
 
       {/* Filters */}
-      <div className="p-4 border-b border-slate-200 bg-white">
+      <div className={`p-4 border-b ${themeClasses.border.default} ${themeClasses.bg.secondary}`}>
         <div className="space-y-3">
           <div className="flex items-center space-x-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${themeClasses.text.tertiary}`} size={16} />
               <input
                 type="text"
-                placeholder="Buscar evidencias..."
+                placeholder="BUSCAR_EVIDENCIAS..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                className={`w-full pl-9 pr-3 py-2 text-sm rounded-lg font-mono ${themeClasses.inputClass}`}
               />
             </div>
             <div className="flex items-center space-x-2">
-              <Filter size={16} className="text-slate-400" />
+              <Filter size={16} className={themeClasses.text.tertiary} />
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as EvidenceType | 'All')}
-                className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className={`text-sm rounded-lg px-3 py-2 font-mono ${themeClasses.inputClass}`}
               >
-                <option value="All">Todos los tipos</option>
+                <option value="All">TODOS_LOS_TIPOS</option>
                 {Object.values(EvidenceType).map(type => (
                   <option key={type} value={type}>{type}</option>
                 ))}
@@ -243,17 +247,17 @@ const EvidenceRegistry: React.FC<Props> = ({
           {/* Asset Filter */}
           {operation.assets && operation.assets.length > 0 && (
             <div className="flex items-center space-x-2">
-              <span className="text-xs font-medium text-slate-600">Filtrar por asset:</span>
+              <span className={`text-xs font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>FILTRAR_POR_ASSET:</span>
               <select
                 onChange={(e) => {
                   // This would filter evidence by asset
                   // For now, just a placeholder
                 }}
-                className="text-xs border border-slate-300 rounded-lg px-2 py-1 focus:ring-emerald-500 focus:border-emerald-500"
+                className={`text-xs rounded-lg px-2 py-1 font-mono ${themeClasses.inputClass}`}
               >
-                <option value="">Todos los assets</option>
+                <option value="">TODOS_LOS_ASSETS</option>
                 {operation.assets.map(asset => (
-                  <option key={asset.id} value={asset.id}>{asset.name}</option>
+                  <option key={asset.id} value={asset.id}>{asset.name.toUpperCase().replace(/\s/g, '_')}</option>
                 ))}
               </select>
             </div>
@@ -262,50 +266,58 @@ const EvidenceRegistry: React.FC<Props> = ({
       </div>
 
       {/* Documents List */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className={`flex-1 overflow-y-auto p-4 ${themeClasses.scrollbar.track} ${themeClasses.scrollbar.thumb}`}>
         {filteredDocuments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+          <div className={`flex flex-col items-center justify-center h-64 ${themeClasses.text.tertiary}`}>
             <FileText size={48} className="mb-4 opacity-50" />
-            <p className="text-sm">No hay evidencias registradas</p>
-            <p className="text-xs mt-1">Añade documentos para comenzar</p>
+            <p className={`text-sm font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>NO_HAY_EVIDENCIAS_REGISTRADAS</p>
+            <p className={`text-xs mt-1 font-mono uppercase tracking-wider ${themeClasses.text.tertiary}`}>AÑADE_DOCUMENTOS_PARA_COMENZAR</p>
           </div>
         ) : (
           <div className="space-y-3">
             {filteredDocuments.map(doc => (
               <div
                 key={doc.id}
-                className="p-4 border border-slate-200 rounded-lg hover:border-emerald-300 hover:shadow-sm transition-all bg-white"
+                className={`p-4 border ${themeClasses.card.border} rounded-lg transition-all ${themeClasses.card.bg} ${themeClasses.card.hover}`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
-                      <FileText size={18} className="text-emerald-600" />
-                      <h4 className="font-semibold text-slate-900">{doc.name}</h4>
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded border border-blue-100">
+                      <FileText size={18} className={themeClasses.text.accent} />
+                      <h4 className={`font-semibold font-mono uppercase tracking-wider ${themeClasses.text.primary}`}>{doc.name.toUpperCase().replace(/\s/g, '_')}</h4>
+                      <span className={`px-2 py-0.5 text-xs font-mono uppercase tracking-wider rounded border ${themeClasses.badge.info}`}>
                         {doc.type}
                       </span>
                     </div>
                     
                     {doc.description && (
-                      <p className="text-sm text-slate-600 mb-3">{doc.description}</p>
+                      <p className={`text-sm font-mono mb-3 ${themeClasses.text.secondary}`}>{doc.description.toUpperCase()}</p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                    <div className={`flex flex-wrap items-center gap-4 text-xs font-mono ${themeClasses.text.tertiary}`}>
                       {doc.documentDate && (
                         <div className="flex items-center">
                           <Calendar size={12} className="mr-1" />
-                          {new Date(doc.documentDate).toLocaleDateString()}
+                          {(() => {
+                            try {
+                              const dateRaw = doc.documentDate;
+                              const date = dateRaw instanceof Date ? dateRaw : new Date(String(dateRaw));
+                              return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+                            } catch (e) {
+                              return '';
+                            }
+                          })()}
                         </div>
                       )}
                       {doc.author && (
                         <div className="flex items-center">
                           <User size={12} className="mr-1" />
-                          {doc.author}
+                          {doc.author.toUpperCase()}
                         </div>
                       )}
                       {doc.uploadedBy && (
                         <div className="flex items-center">
-                          <span>Subido por: {doc.uploadedBy}</span>
+                          <span>SUBIDO_POR: {doc.uploadedBy.toUpperCase().replace(/\s/g, '_')}</span>
                         </div>
                       )}
                       {doc.relatedObjective && (
@@ -321,9 +333,9 @@ const EvidenceRegistry: React.FC<Props> = ({
                         {doc.tags.map((tag, idx) => (
                           <span
                             key={idx}
-                            className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200"
+                            className={`px-2 py-0.5 text-xs font-mono uppercase tracking-wider rounded border ${themeClasses.badge.neutral}`}
                           >
-                            {tag}
+                            {tag.toUpperCase()}
                           </span>
                         ))}
                       </div>
@@ -336,8 +348,8 @@ const EvidenceRegistry: React.FC<Props> = ({
                         href={doc.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                        title="Abrir documento"
+                        className={`p-2 rounded transition-colors ${themeClasses.text.accent} ${themeClasses.bg.hover}`}
+                        title="ABRIR_DOCUMENTO"
                       >
                         <LinkIcon size={16} />
                       </a>
@@ -345,8 +357,8 @@ const EvidenceRegistry: React.FC<Props> = ({
                     {onDeleteEvidence && (
                       <button
                         onClick={() => onDeleteEvidence(doc.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Eliminar"
+                        className={`p-2 rounded transition-colors ${themeClasses.text.danger} ${themeClasses.bg.hover}`}
+                        title="ELIMINAR"
                       >
                         <Trash2 size={16} />
                       </button>

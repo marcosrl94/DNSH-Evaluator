@@ -15,7 +15,16 @@ interface JourneyMetricsProps {
 }
 
 export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) => {
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:15',message:'JourneyMetrics render',data:{operationsType:typeof operations,operationsIsArray:Array.isArray(operations),operationsLength:Array.isArray(operations)?operations.length:'not array'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
+  
   const { theme } = useTheme();
+  
+  // Ensure operations is an array
+  const safeOperations = Array.isArray(operations) ? operations : [];
 
   const metrics = useMemo(() => {
     const stageCounts: Record<JourneyStage, number> = {
@@ -30,25 +39,48 @@ export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) =>
     let completedOperations = 0;
     let blockedOperations = 0;
 
-    operations.forEach(operation => {
-      const progress = calculateJourneyProgress(operation);
-      stageCounts[progress.stage]++;
-      totalProgress += progress.progress;
+    safeOperations.forEach(operation => {
+      // #region agent log
+      try {
+        fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:35',message:'Calculating journey progress',data:{operationId:String(operation.id||''),operationIdType:typeof operation.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      } catch (e) {}
+      // #endregion
       
-      if (progress.completed) {
-        completedOperations++;
-      }
+      try {
+        const progress = calculateJourneyProgress(operation);
+        const stageStr = String(progress.stage || '');
+        if (stageCounts[stageStr as JourneyStage] !== undefined) {
+          stageCounts[stageStr as JourneyStage]++;
+        }
+        const progValue = typeof progress.progress === 'number' ? progress.progress : Number(progress.progress) || 0;
+        totalProgress += progValue;
       
-      // Consider blocked if stuck in same stage for > 7 days
-      const lastUpdated = new Date(progress.lastUpdated);
-      const daysSinceUpdate = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSinceUpdate > 7 && !progress.completed) {
-        blockedOperations++;
+        if (progress.completed) {
+          completedOperations++;
+        }
+        
+        // Consider blocked if stuck in same stage for > 7 days
+        // #region agent log
+        try {
+          const lastUpdatedRaw = progress.lastUpdated;
+          fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:43',message:'Converting lastUpdated to Date',data:{lastUpdatedType:typeof lastUpdatedRaw,lastUpdatedValue:lastUpdatedRaw instanceof Date ? lastUpdatedRaw.toISOString() : String(lastUpdatedRaw),isDate:lastUpdatedRaw instanceof Date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          const lastUpdated = lastUpdatedRaw instanceof Date ? lastUpdatedRaw : new Date(String(lastUpdatedRaw));
+          const daysSinceUpdate = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceUpdate > 7 && !progress.completed) {
+            blockedOperations++;
+          }
+        } catch (e) {
+          fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:43',message:'Error converting lastUpdated',data:{conversionError:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        }
+        // #endregion
+      } catch (e) {
+        fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:35',message:'Error calculating progress for operation',data:{error:String(e),operationId:String(operation.id||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       }
     });
 
-    const averageProgress = operations.length > 0 ? totalProgress / operations.length : 0;
-    const completionRate = operations.length > 0 ? (completedOperations / operations.length) * 100 : 0;
+    const totalOps = safeOperations.length;
+    const averageProgress = totalOps > 0 ? totalProgress / totalOps : 0;
+    const completionRate = totalOps > 0 ? (completedOperations / totalOps) * 100 : 0;
 
     return {
       stageCounts,
@@ -56,9 +88,9 @@ export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) =>
       completionRate,
       completedOperations,
       blockedOperations,
-      totalOperations: operations.length,
+      totalOperations: safeOperations.length,
     };
-  }, [operations]);
+  }, [safeOperations]);
 
   const themeClasses = {
     bg: {
@@ -135,13 +167,15 @@ export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) =>
         </h4>
         <div className="space-y-3">
           {JOURNEY_STAGES.map((stageMeta, index) => {
-            const count = metrics.stageCounts[stageMeta.stage];
-            const percentage = metrics.totalOperations > 0 
-              ? (count / metrics.totalOperations) * 100 
+            const stageKey = String(stageMeta.stage);
+            const count = Number(metrics.stageCounts[stageKey as JourneyStage] || 0);
+            const totalOps = Number(metrics.totalOperations || 0);
+            const percentage = totalOps > 0 
+              ? (count / totalOps) * 100 
               : 0;
 
             return (
-              <div key={stageMeta.stage} className="space-y-1">
+              <div key={String(stageMeta.stage)} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <span className={`text-xs font-mono ${themeClasses.text.secondary}`}>

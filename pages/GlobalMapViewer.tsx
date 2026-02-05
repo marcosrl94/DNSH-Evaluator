@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Asset, HazardType, Client, Operation, DnshObjective } from '../types';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
+import { getAssetObjectiveStatus } from '../services/dnshEvaluationService';
 import { logger } from '../utils/logger';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
@@ -100,8 +101,34 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
       : null;
   
   // Get DNSH status for selected asset
-  const getAssetDnshStatus = (asset: Asset) => {
-    return asset.dnshEvaluation?.overallStatus || 'Not Assessed';
+  // Calculate from individual objectives to ensure consistency
+  // This ensures that if all objectives are "Not Assessed", the overall status is also "Not Assessed"
+  const getAssetDnshStatus = (asset: Asset): 'Compliant' | 'Non-Compliant' | 'Conditional' | 'Not Assessed' => {
+    if (!asset.dnshEvaluation) return 'Not Assessed';
+
+    // Get status for each objective using centralized function
+    const objectiveStatuses = Object.values(DnshObjective).map(objective => 
+      getAssetObjectiveStatus(asset, objective)
+    );
+
+    // Check if all objectives are Not Assessed
+    const allNotAssessed = objectiveStatuses.every(status => status === 'Not Assessed');
+    if (allNotAssessed) return 'Not Assessed';
+
+    // Check for Non-Compliant (highest priority)
+    if (objectiveStatuses.some(status => status === 'Non-Compliant')) return 'Non-Compliant';
+
+    // Check if all assessed objectives are Compliant
+    const assessedStatuses = objectiveStatuses.filter(status => status !== 'Not Assessed');
+    if (assessedStatuses.length > 0 && assessedStatuses.every(status => status === 'Compliant')) {
+      return 'Compliant';
+    }
+
+    // Check for Conditional
+    if (objectiveStatuses.some(status => status === 'Conditional')) return 'Conditional';
+
+    // Default: if we have some assessed but mixed results, return Conditional
+    return assessedStatuses.length > 0 ? 'Conditional' : 'Not Assessed';
   };
   
   const getAssetDnshStatusColor = (status: string) => {

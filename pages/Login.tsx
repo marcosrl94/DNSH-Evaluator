@@ -411,13 +411,17 @@ const LoginPage: React.FC = () => {
           setTimeout(interceptClicks, 1000);
           setTimeout(interceptClicks, 1500);
         } catch (renderError) {
-          console.error('Error rendering Google button:', renderError);
+          // Safely convert error to string
+          const errorMsg = renderError instanceof Error ? renderError.message : String(renderError || 'Unknown error');
+          console.error('Error rendering Google button:', errorMsg);
           initializationAttemptedRef.current = false;
           window.__GOOGLE_INITIALIZED__ = false;
           window.__GOOGLE_BUTTON_RENDERED__ = false;
         }
       } catch (error) {
-        console.error('Error initializing Google Sign-In:', error);
+        // Safely convert error to string
+        const errorMsg = error instanceof Error ? error.message : String(error || 'Unknown error');
+        console.error('Error initializing Google Sign-In:', errorMsg);
         initializationAttemptedRef.current = false;
         window.__GOOGLE_INITIALIZED__ = false;
         window.__GOOGLE_BUTTON_RENDERED__ = false;
@@ -661,7 +665,9 @@ const LoginPage: React.FC = () => {
                         setLoginSuccess(true);
                       } catch (err: any) {
                         setLocalError(err.message || 'Error al iniciar sesión');
-                        console.error('Google login error:', err);
+                        // Safely convert error to string
+                        const errorMsg = err instanceof Error ? err.message : String(err || 'Unknown error');
+                        console.error('Google login error:', errorMsg);
                       }
                     }}
                     disabled={isLoading}

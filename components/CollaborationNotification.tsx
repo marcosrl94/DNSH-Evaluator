@@ -145,11 +145,12 @@ export const CollaborationNotification: React.FC = () => {
   }
 
   return (
-    <div className="fixed top-20 right-4 z-50 space-y-2">
+    <div className="fixed top-20 right-4 z-40 space-y-2" style={{ pointerEvents: 'none' }}>
       {notifications.map((notification) => (
         <div
           key={notification.id}
           className={`flex items-start space-x-3 p-3 rounded-lg border shadow-lg min-w-[300px] max-w-[400px] ${getNotificationColor(notification.type)} transition-all animate-in slide-in-from-right`}
+          style={{ pointerEvents: 'auto' }}
         >
           <div className="flex-shrink-0 mt-0.5">
             {getNotificationIcon(notification.type)}
@@ -157,9 +158,22 @@ export const CollaborationNotification: React.FC = () => {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium font-mono">{String(notification.message || '')}</p>
             <p className="text-xs opacity-75 mt-0.5">
-              {notification.timestamp instanceof Date 
-                ? notification.timestamp.toLocaleTimeString()
-                : new Date(notification.timestamp).toLocaleTimeString()}
+              {(() => {
+                // #region agent log
+                try {
+                  const ts = notification.timestamp;
+                  fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollaborationNotification.tsx:160',message:'Rendering notification timestamp',data:{timestampType:typeof ts,isDate:ts instanceof Date,timestampValue:ts instanceof Date ? ts.toISOString() : String(ts)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                  if (ts instanceof Date) {
+                    return ts.toLocaleTimeString();
+                  }
+                  const date = new Date(String(ts));
+                  return isNaN(date.getTime()) ? '' : date.toLocaleTimeString();
+                } catch (e) {
+                  fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollaborationNotification.tsx:160',message:'Error converting notification timestamp',data:{conversionError:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                  return '';
+                }
+                // #endregion
+              })()}
             </p>
           </div>
           <button
@@ -173,3 +187,5 @@ export const CollaborationNotification: React.FC = () => {
     </div>
   );
 };
+
+export default CollaborationNotification;

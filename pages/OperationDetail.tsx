@@ -8,6 +8,7 @@ import AssetDetailPanel from '../components/AssetDetailPanel';
 import { JourneyProgressIndicator } from '../components/JourneyProgress';
 import { calculateObjectiveStats } from '../utils/dnshCalculations';
 import { calculateJourneyProgress } from '../services/journeyService';
+import { JourneyStage } from '../types/journey';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +37,8 @@ const OperationDetailPage: React.FC<Props> = ({
   const [showAssetDetail, setShowAssetDetail] = useState(false);
   const [showEvidencePanel, setShowEvidencePanel] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editedOperation, setEditedOperation] = useState<Operation>(operation);
 
   const selectedAsset = selectedAssetId && Array.isArray(operation.assets)
     ? operation.assets.find(a => a.id === selectedAssetId)
@@ -83,6 +86,23 @@ const OperationDetailPage: React.FC<Props> = ({
     if (onUpdateOperation) {
       onUpdateOperation(updatedOperation);
     }
+  };
+
+  const handleEditOperation = () => {
+    setEditedOperation({ ...operation });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (onUpdateOperation) {
+      onUpdateOperation(editedOperation);
+    }
+    setShowEditModal(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditedOperation({ ...operation });
+    setShowEditModal(false);
   };
 
   const handleArchiveOperation = async () => {
@@ -193,7 +213,37 @@ const OperationDetailPage: React.FC<Props> = ({
 
   // Calculate journey progress
   const journeyProgress = useMemo(() => {
-    return calculateJourneyProgress(operation);
+    // #region agent log
+    try {
+      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:192',message:'Calculating journey progress',data:{operationId:String(operation.id||''),operationIdType:typeof operation.id,hasAssets:!!operation.assets,assetsCount:Array.isArray(operation.assets)?operation.assets.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    } catch (e) {}
+    // #endregion
+    
+    try {
+      const progress = calculateJourneyProgress(operation);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:196',message:'Journey progress calculated',data:{progressStage:String(progress.stage),progressProgress:typeof progress.progress,progressProgressValue:progress.progress,lastUpdatedType:typeof progress.lastUpdated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      return progress;
+    } catch (e) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:196',message:'Error calculating journey progress',data:{error:String(e),errorStack:String((e as Error)?.stack||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      // Return default progress on error
+      return {
+        operationId: String(operation.id || ''),
+        stage: JourneyStage.INPUT_LOADING,
+        completed: false,
+        progress: 0,
+        lastUpdated: String(operation.updatedAt || operation.createdAt || new Date().toISOString()),
+        updatedBy: String(operation.updatedBy || 'system')
+      };
+    }
+  }, [operation]);
+
+  // Update editedOperation when operation prop changes
+  React.useEffect(() => {
+    setEditedOperation({ ...operation });
   }, [operation]);
 
   return (
@@ -230,6 +280,7 @@ const OperationDetailPage: React.FC<Props> = ({
           <div className="flex items-center space-x-3">
             <button 
               type="button"
+              onClick={handleEditOperation}
               className="px-4 py-2 bg-[#111111] border border-[#1a1a1a] text-[#666666] rounded-lg font-medium hover:bg-[#1a1a1a] hover:text-white transition-all flex items-center font-mono uppercase tracking-wider text-xs cursor-pointer active:scale-[0.95]"
             >
               <Edit size={14} className="mr-2" />
@@ -340,7 +391,31 @@ const OperationDetailPage: React.FC<Props> = ({
 
               {/* Journey Progress */}
               <div className="mt-4">
-                <JourneyProgressIndicator progress={journeyProgress} showLabels={false} compact={false} />
+                {(() => {
+                  // #region agent log
+                  try {
+                    const prog = journeyProgress;
+                    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:343',message:'Rendering JourneyProgressIndicator',data:{progressType:typeof prog,progressStageType:typeof prog?.stage,progressProgressType:typeof prog?.progress,progressProgressValue:prog?.progress,progressLastUpdatedType:typeof prog?.lastUpdated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                  } catch (e) {
+                    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:343',message:'Error logging JourneyProgressIndicator',data:{error:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                  }
+                  // #endregion
+                  
+                  if (!journeyProgress || typeof journeyProgress !== 'object') {
+                    return null;
+                  }
+                  
+                  // Ensure all properties are primitives
+                  const safeProgress = {
+                    ...journeyProgress,
+                    operationId: String(journeyProgress.operationId || ''),
+                    progress: Number(journeyProgress.progress || 0),
+                    lastUpdated: String(journeyProgress.lastUpdated || ''),
+                    updatedBy: String(journeyProgress.updatedBy || 'system')
+                  };
+                  
+                  return <JourneyProgressIndicator progress={safeProgress} showLabels={false} compact={false} />;
+                })()}
               </div>
 
               {/* DNSH Objectives Quick Access */}
@@ -624,6 +699,169 @@ const OperationDetailPage: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      {/* Edit Operation Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className={`${themeClasses.bg.secondary} rounded-xl border ${themeClasses.border.default} p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className={`text-xl font-bold font-mono uppercase tracking-wider ${themeClasses.text.primary}`}>
+                EDITAR_OPERACION
+              </h2>
+              <button
+                onClick={handleCancelEdit}
+                className={`p-2 rounded-lg ${themeClasses.bg.tertiary} ${themeClasses.border.default} border hover:border-[#00ff88]/30 transition-all`}
+              >
+                <X size={20} className={themeClasses.text.primary} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                  NOMBRE_OPERACION
+                </label>
+                <input
+                  type="text"
+                  value={editedOperation.name}
+                  onChange={(e) => setEditedOperation({ ...editedOperation, name: e.target.value })}
+                  className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                  DESCRIPCION
+                </label>
+                <textarea
+                  value={editedOperation.description || ''}
+                  onChange={(e) => setEditedOperation({ ...editedOperation, description: e.target.value })}
+                  rows={3}
+                  className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                />
+              </div>
+
+              {/* Grid: Sector, Country, Client */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                    SECTOR_NACE
+                  </label>
+                  <input
+                    type="text"
+                    value={editedOperation.sectorNACE || ''}
+                    onChange={(e) => setEditedOperation({ ...editedOperation, sectorNACE: e.target.value })}
+                    className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                    PAIS
+                  </label>
+                  <input
+                    type="text"
+                    value={editedOperation.country || ''}
+                    onChange={(e) => setEditedOperation({ ...editedOperation, country: e.target.value })}
+                    className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                    CLIENT_ID
+                  </label>
+                  <input
+                    type="text"
+                    value={editedOperation.clientId || ''}
+                    onChange={(e) => setEditedOperation({ ...editedOperation, clientId: e.target.value })}
+                    className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                  />
+                </div>
+              </div>
+
+              {/* Grid: Financial */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                    CAPEX (€)
+                  </label>
+                  <input
+                    type="number"
+                    value={editedOperation.capex || 0}
+                    onChange={(e) => setEditedOperation({ ...editedOperation, capex: parseFloat(e.target.value) || 0 })}
+                    className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                    DEAL_PRICE (€)
+                  </label>
+                  <input
+                    type="number"
+                    value={editedOperation.dealPrice || 0}
+                    onChange={(e) => setEditedOperation({ ...editedOperation, dealPrice: parseFloat(e.target.value) || 0 })}
+                    className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                    EXPECTED_RETURN (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={editedOperation.expectedReturn || 0}
+                    onChange={(e) => setEditedOperation({ ...editedOperation, expectedReturn: parseFloat(e.target.value) || 0 })}
+                    className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                  />
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                    FECHA_INICIO
+                  </label>
+                  <input
+                    type="date"
+                    value={editedOperation.startDate || ''}
+                    onChange={(e) => setEditedOperation({ ...editedOperation, startDate: e.target.value })}
+                    className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                    FECHA_FIN
+                  </label>
+                  <input
+                    type="date"
+                    value={editedOperation.endDate || ''}
+                    onChange={(e) => setEditedOperation({ ...editedOperation, endDate: e.target.value })}
+                    className={`w-full px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.primary} font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[#1a1a1a]">
+              <button
+                onClick={handleCancelEdit}
+                className={`px-4 py-2 ${themeClasses.bg.tertiary} ${themeClasses.border.default} border rounded-lg ${themeClasses.text.secondary} font-mono uppercase tracking-wider text-xs hover:${themeClasses.text.primary} transition-all`}
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="px-4 py-2 bg-[#00ff88]/20 border border-[#00ff88]/30 text-[#00ff88] rounded-lg font-mono uppercase tracking-wider text-xs hover:bg-[#00ff88]/30 transition-all"
+              >
+                GUARDAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

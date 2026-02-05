@@ -17,7 +17,9 @@ const CatalogsPage: React.FC = () => {
   const allMeasures = useMemo(() => {
     try {
       const measures = getAllMeasures();
-      logger.debug('CatalogsPage: Loaded measures', measures.length);
+      // Safely log - ensure measures.length is a number
+      const measuresCount = typeof measures === 'object' && Array.isArray(measures) ? measures.length : 0;
+      logger.debug('CatalogsPage: Loaded measures', { count: measuresCount });
       return measures;
     } catch (error) {
       logger.error('CatalogsPage: Error loading measures', error);
@@ -64,7 +66,15 @@ const CatalogsPage: React.FC = () => {
       filtered = filtered.filter(m => m && m.category === selectedCategory);
     }
     
-    logger.debug('CatalogsPage: Filtered measures', filtered.length, 'from', allMeasures.length, 'searchTerm:', searchTerm, 'category:', selectedCategory);
+    // Safely log - ensure all values are primitives
+    const filteredCount = typeof filtered === 'object' && Array.isArray(filtered) ? filtered.length : 0;
+    const allMeasuresCount = typeof allMeasures === 'object' && Array.isArray(allMeasures) ? allMeasures.length : 0;
+    logger.debug('CatalogsPage: Filtered measures', { 
+      filtered: filteredCount, 
+      total: allMeasuresCount, 
+      searchTerm: String(searchTerm || ''), 
+      category: String(selectedCategory || '') 
+    });
     return filtered;
   }, [allMeasures, searchTerm, selectedCategory]);
 

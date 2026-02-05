@@ -1,3 +1,7 @@
+// CRITICAL: Import console polyfill FIRST before any other imports
+// This intercepts console.error/warn/log to prevent "Cannot convert object to primitive value" errors
+import './console-polyfill';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';

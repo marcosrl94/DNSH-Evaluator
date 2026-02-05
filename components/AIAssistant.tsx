@@ -318,7 +318,22 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
                       <p className={`text-xs mt-1 ${
                         message.role === 'user' ? 'text-emerald-100' : 'text-slate-400'
                       }`}>
-                        {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                        {(() => {
+                          // #region agent log
+                          try {
+                            const ts = message.timestamp;
+                            fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AIAssistant.tsx:321',message:'Rendering timestamp',data:{timestampType:typeof ts,isDate:ts instanceof Date,timestampValue:ts instanceof Date ? ts.toISOString() : String(ts)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                            if (ts instanceof Date) {
+                              return ts.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                            }
+                            const date = new Date(ts);
+                            return isNaN(date.getTime()) ? '' : date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                          } catch (e) {
+                            fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AIAssistant.tsx:321',message:'Error converting timestamp',data:{conversionError:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                            return '';
+                          }
+                          // #endregion
+                        })()}
                       </p>
                     </div>
                   </div>

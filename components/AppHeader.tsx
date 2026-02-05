@@ -36,14 +36,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const getViewTitle = (): string => {
     if (currentView === 'client-detail' && selectedClient) {
-      return `CLIENT_DETAIL: ${selectedClient.name.toUpperCase().replace(/\s/g, '_')}`;
+      const name = String(selectedClient.name || '');
+      return `CLIENT_DETAIL: ${name.toUpperCase().replace(/\s/g, '_')}`;
     }
     if (currentView === 'operation-detail' && selectedOperation) {
-      return `OP_DETAIL: ${selectedOperation.name.toUpperCase().replace(/\s/g, '_')}`;
+      const name = String(selectedOperation.name || '');
+      return `OP_DETAIL: ${name.toUpperCase().replace(/\s/g, '_')}`;
     }
     if (currentView === 'dnsh-evaluation') {
       return selectedAsset
-        ? `DNSH_EVAL: ${selectedAsset.name.toUpperCase().replace(/\s/g, '_')}`
+        ? `DNSH_EVAL: ${String(selectedAsset.name || '').toUpperCase().replace(/\s/g, '_')}`
         : 'DNSH_EVAL_COMPLETE';
     }
     if (currentView === 'operation-list') return 'OPS_PORTFOLIO';
@@ -64,8 +66,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <div className="absolute top-4 right-4 flex items-center space-x-3">
           {/* Online Users Indicator */}
           <OnlineUsersIndicator 
-            operationId={selectedOperation?.id}
-            assetId={selectedAsset?.id}
+            operationId={selectedOperation?.id ? String(selectedOperation.id) : undefined}
+            assetId={selectedAsset?.id ? String(selectedAsset.id) : undefined}
             maxVisible={5}
           />
           
@@ -131,7 +133,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 onClick={() => { setCurrentView('operation-detail'); }}
                 className={theme === 'dark' ? 'hover:text-[#00ff88] transition-colors' : 'hover:text-[#0066cc] transition-colors'}
               >
-                {selectedOperation.name}
+                {String(selectedOperation.name || '')}
               </button>
             </>
           )}
@@ -140,7 +142,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               <ChevronRight size={12} />
               <span className={`font-medium font-mono uppercase tracking-wider ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
-              }`}>{selectedAsset.name.toUpperCase().replace(/\s/g, '_')}</span>
+              }`}>{String(selectedAsset.name || '').toUpperCase().replace(/\s/g, '_')}</span>
             </>
           )}
         </nav>

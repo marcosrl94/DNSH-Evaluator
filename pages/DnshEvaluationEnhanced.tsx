@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Operation, DnshObjective, Asset, EvidenceDocument, AssetDnshEvaluation, AssetDnshAnswer } from '../types';
 import EvidenceModal from '../components/EvidenceModal';
+import EvidenceRegistry from '../components/EvidenceRegistry';
 import { DNSH_CHECKLIST_TEMPLATES, EU_TAXONOMY_HAZARDS } from '../constants';
 import MapViewer from '../components/MapViewer';
 import { findNearbyKBAs } from '../constants/kbas';
@@ -49,7 +50,8 @@ import { getMeasuresByHazardSorted, getRecommendedMeasuresForCompliance, findMea
 import { getAllMeasures, EXTENDED_MEASURES } from '../constants/extendedMeasures';
 import { AdaptationAssessment, RiskBand } from '../types';
 import { AVAILABLE_MEASURES } from '../constants';
-import { determineAllHazardScopes } from '../services/hazardScopeDetermination';
+import { determineAllHazardScopes, ScopeDeterminationResult } from '../services/hazardScopeDetermination';
+import { identifyMissingData } from '../services/missingDataService';
 
 interface Props {
   operation: Operation;
@@ -59,7 +61,6 @@ interface Props {
   initialObjective?: DnshObjective; // Optional: start with this objective selected
 }
 
-type ViewMode = 'Portfolio' | 'Group' | 'Asset';
 type GroupingStrategy = 'ByAssetType' | 'ByRiskProfile' | 'None';
 
 const DnshEvaluationEnhancedPage: React.FC<Props> = ({ 
@@ -85,8 +86,7 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
     initializeCatalog(AVAILABLE_MEASURES);
   }, []);
   
-  // View configuration
-  const [viewMode, setViewMode] = useState<ViewMode>(initialAssetId ? 'Asset' : 'Portfolio');
+  // View configuration - Simplified: no explicit mode switching needed
   const [groupingStrategy, setGroupingStrategy] = useState<GroupingStrategy>('ByAssetType');
   const [selectedObjective, setSelectedObjective] = useState<DnshObjective>(initialObjective);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -99,16 +99,51 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
   // Evidence modal state
   const [showEvidenceModal, setShowEvidenceModal] = useState(false);
   
-  // Display sections (modular)
-  const [showSections, setShowSections] = useState({
-    overview: true,
-    substantialContribution: true,
-    objectiveEvaluations: true,
-    checklist: true, // Default to true when in Asset view
-    evidence: true,
-    materialityAssessment: false, // Includes map and scenario comparison
-    adaptationDetails: false
-  });
+  // Active tab/section - tabs are now per-objective
+  type SectionTab = 'overview' | 'checklist' | 'evidence' | 'materialityAssessment' | 'adaptationDetails';
+  const [activeTab, setActiveTab] = useState<SectionTab>('overview');
+  
+  // Get available tabs based on current objective and selected asset
+  const availableTabs = useMemo<SectionTab[]>(() => {
+    const tabs: SectionTab[] = ['overview', 'evidence']; // Evidence always available
+    
+    // Asset-specific tabs - available when asset is selected
+    if (selectedAssetId) {
+      tabs.push('checklist', 'materialityAssessment');
+      
+      // Adaptation details only for ADAPTATION objective
+      if (selectedObjective === DnshObjective.ADAPTATION) {
+        tabs.push('adaptationDetails');
+      }
+    }
+    
+    return tabs;
+  }, [selectedAssetId, selectedObjective]);
+  
+  // Auto-switch to appropriate tab when context changes
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      // If current tab is not available, switch to first available
+      // Prefer 'checklist' if asset selected, otherwise 'overview'
+      const preferredTab = (selectedAssetId && availableTabs.includes('checklist')) 
+        ? 'checklist' 
+        : (availableTabs[0] || 'overview');
+      setActiveTab(preferredTab);
+    }
+  }, [availableTabs, activeTab, selectedAssetId]);
+  
+  // Auto-switch tab when objective changes - reset to overview for new objective
+  useEffect(() => {
+    // When objective changes, reset to overview (or first available tab)
+    const resetTab = () => {
+      if (availableTabs.includes('overview')) {
+        setActiveTab('overview');
+      } else if (availableTabs.length > 0) {
+        setActiveTab(availableTabs[0]);
+      }
+    };
+    resetTab();
+  }, [selectedObjective, availableTabs]); // Include availableTabs to ensure tabs update when view mode changes
   
   // Portfolio analysis
   const portfolioAnalysis = useMemo(() => {
@@ -125,13 +160,12 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
     };
   }, [operation.assets, groupingStrategy]);
   
-  // Auto-select grouping strategy based on homogeneity
-  React.useEffect(() => {
-    if (portfolioAnalysis.homogeneity.isHomogeneous && groupingStrategy === 'None') {
-      setGroupingStrategy('ByAssetType');
-      setViewMode('Group');
-    }
-  }, [portfolioAnalysis.homogeneity.isHomogeneous]);
+  // Auto-select grouping strategy based on homogeneity (removed auto-switch to Group mode)
+  // React.useEffect(() => {
+  //   if (portfolioAnalysis.homogeneity.isHomogeneous && groupingStrategy === 'None') {
+  //     setGroupingStrategy('ByAssetType');
+  //   }
+  // }, [portfolioAnalysis.homogeneity.isHomogeneous]);
   
   // Selected group assets
   const selectedGroup = useMemo(() => {
@@ -165,17 +199,37 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
     return evalData;
   }, [selectedGroup, operation.assets]);
   
-  const toggleSection = (section: keyof typeof showSections) => {
-    setShowSections(prev => {
-      const newState = { ...prev, [section]: !prev[section] };
-      return newState;
-    });
+  // Tab labels mapping - tabs are per-objective now
+  const tabLabels: Record<SectionTab, string> = {
+    overview: 'OVERVIEW',
+    checklist: 'CHECKLIST',
+    evidence: 'EVIDENCE',
+    materialityAssessment: 'MATERIALITY_ASSESSMENT',
+    adaptationDetails: 'ADAPTATION_DETAILS'
+  };
+  
+  // Tab icons mapping
+  const tabIcons: Record<SectionTab, React.ReactNode> = {
+    overview: <BarChart3 size={14} />,
+    checklist: <FileText size={14} />,
+    evidence: <Database size={14} />,
+    materialityAssessment: <MapPin size={14} />,
+    adaptationDetails: <Activity size={14} />
+  };
+  
+  // Get objective label for display
+  const objectiveLabels: Record<DnshObjective, string> = {
+    [DnshObjective.MITIGATION]: 'MITIGATION',
+    [DnshObjective.ADAPTATION]: 'ADAPTATION',
+    [DnshObjective.WATER]: 'WATER',
+    [DnshObjective.CIRCULAR]: 'CIRCULAR',
+    [DnshObjective.POLLUTION]: 'POLLUTION',
+    [DnshObjective.BIODIVERSITY]: 'BIODIVERSITY',
   };
   
   // Handler to select asset from map
   const handleSelectAssetFromMap = (assetId: string) => {
     setSelectedAssetId(assetId);
-    setViewMode('Asset');
     // Scroll to top of asset view
     setTimeout(() => {
       const element = document.querySelector('.flex-1.overflow-y-auto');
@@ -244,7 +298,7 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
   
   // Load existing answers when asset is selected
   React.useEffect(() => {
-    if (selectedAssetId && viewMode === 'Asset') {
+    if (selectedAssetId) {
       const asset = operation.assets.find(a => a.id === selectedAssetId);
       if (asset?.dnshEvaluation?.checklistAnswers) {
         const answers: Record<string, AssetDnshAnswer> = {};
@@ -266,8 +320,10 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
       } else {
         setChecklistAnswers({});
       }
+    } else {
+      setChecklistAnswers({});
     }
-  }, [selectedAssetId, viewMode, operation.assets]);
+  }, [selectedAssetId, operation.assets]);
   
   const getStatusColor = useCallback((status: string) => {
     switch (status) {
@@ -290,130 +346,217 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
     }
   }, [theme, themeClasses]);
   
-  const objectiveLabels: Record<DnshObjective, string> = {
-    [DnshObjective.MITIGATION]: 'MITIGATION',
-    [DnshObjective.ADAPTATION]: 'ADAPTATION',
-    [DnshObjective.WATER]: 'WATER',
-    [DnshObjective.CIRCULAR]: 'CIRCULAR',
-    [DnshObjective.POLLUTION]: 'POLLUTION',
-    [DnshObjective.BIODIVERSITY]: 'BIODIVERSITY',
-  };
-  
   return (
     <div className={`h-full flex flex-col transition-colors ${themeClasses.bg.primary} ${themeClasses.text.primary}`}>
       {/* Header */}
-      <div className={`border-b px-8 py-4 transition-colors ${themeClasses.border.default} ${themeClasses.bg.secondary}`}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={onBack}
-              className={`p-2 rounded-lg transition-colors ${themeClasses.bg.hover} ${themeClasses.text.tertiary} ${themeClasses.button.ghost}`}
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <h1 className={`text-2xl font-bold font-mono uppercase tracking-wider transition-colors ${themeClasses.text.primary}`}>
-                DNSH_EVAL_ENHANCED: {operation.name.toUpperCase().replace(/\s/g, '_')}
-              </h1>
-              <p className={`text-xs font-mono uppercase tracking-wider mt-1 transition-colors ${themeClasses.text.tertiary}`}>
-                {operation.assets.length} ASSETS • {portfolioAnalysis.evaluatedAssets} EVALUATED
-              </p>
+      <div className={`border-b transition-colors ${themeClasses.border.default} ${themeClasses.bg.secondary}`}>
+        <div className="px-8 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <button 
+                onClick={onBack}
+                className={`p-2 rounded-lg transition-colors ${themeClasses.bg.hover} ${themeClasses.text.tertiary} ${themeClasses.button.ghost}`}
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <h1 className={`text-2xl font-bold font-mono uppercase tracking-wider transition-colors ${themeClasses.text.primary}`}>
+                  DNSH_EVAL_ENHANCED: {operation.name.toUpperCase().replace(/\s/g, '_')}
+                </h1>
+                <p className={`text-xs font-mono uppercase tracking-wider mt-1 transition-colors ${themeClasses.text.tertiary}`}>
+                  {operation.assets.length} ASSETS • {portfolioAnalysis.evaluatedAssets} EVALUATED
+                </p>
+              </div>
             </div>
-          </div>
-          
-          {/* View Mode Selector */}
-          <div className={`flex items-center space-x-2 rounded-lg p-1 border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
-            <button
-              onClick={() => setViewMode('Portfolio')}
-              className={`px-4 py-2 rounded text-xs font-mono uppercase tracking-wider transition-all cursor-pointer active:scale-[0.95] ${
-                viewMode === 'Portfolio' 
-                  ? theme === 'dark'
-                    ? 'bg-[#00ff88] text-[#0a0a0a] shadow-lg shadow-[#00ff88]/20'
-                    : 'bg-[#0066cc] text-white shadow-lg shadow-[#0066cc]/20'
-                  : `${themeClasses.text.tertiary} ${themeClasses.button.ghost}`
-              }`}
-            >
-              <BarChart3 size={14} className="inline mr-2" />
-              PORTFOLIO
-            </button>
-            <button
-              onClick={() => setViewMode('Group')}
-              className={`px-4 py-2 rounded text-xs font-mono uppercase tracking-wider transition-all cursor-pointer active:scale-[0.95] ${
-                viewMode === 'Group' 
-                  ? theme === 'dark'
-                    ? 'bg-[#00ff88] text-[#0a0a0a] shadow-lg shadow-[#00ff88]/20'
-                    : 'bg-[#0066cc] text-white shadow-lg shadow-[#0066cc]/20'
-                  : `${themeClasses.text.tertiary} ${themeClasses.button.ghost}`
-              }`}
-            >
-              <Layers size={14} className="inline mr-2" />
-              GROUP
-            </button>
-            <button
-              onClick={() => setViewMode('Asset')}
-              className={`px-4 py-2 rounded text-xs font-mono uppercase tracking-wider transition-all cursor-pointer active:scale-[0.95] ${
-                viewMode === 'Asset' 
-                  ? theme === 'dark'
-                    ? 'bg-[#00ff88] text-[#0a0a0a] shadow-lg shadow-[#00ff88]/20'
-                    : 'bg-[#0066cc] text-white shadow-lg shadow-[#0066cc]/20'
-                  : `${themeClasses.text.tertiary} ${themeClasses.button.ghost}`
-              }`}
-            >
-              <List size={14} className="inline mr-2" />
-              ASSET
-            </button>
+            
+            {/* View Mode Indicator (Info only, no switching needed) */}
+            <div className={`flex items-center space-x-2 text-xs font-mono uppercase tracking-wider transition-colors ${themeClasses.text.tertiary}`}>
+              {selectedAssetId ? (
+                <>
+                  <List size={14} />
+                  <span>ASSET_VIEW</span>
+                </>
+              ) : (
+                <>
+                  <BarChart3 size={14} />
+                  <span>PORTFOLIO_VIEW</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
         
-        {/* Grouping Strategy Selector */}
-        {viewMode === 'Group' && (
-          <div className="flex items-center space-x-4 mt-4">
-            <span className={`text-xs font-mono uppercase tracking-wider transition-colors ${themeClasses.text.tertiary}`}>GROUPING:</span>
-            <div className="flex items-center space-x-2">
-              {(['ByAssetType', 'ByRiskProfile', 'None'] as GroupingStrategy[]).map(strategy => (
-                <button
-                  key={strategy}
-                  onClick={() => setGroupingStrategy(strategy)}
-                  className={`px-3 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer active:scale-[0.95] border ${
-                    groupingStrategy === strategy
-                      ? theme === 'dark'
-                        ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88]/30 shadow-sm shadow-[#00ff88]/10'
-                        : 'bg-[#0066cc]/20 text-[#0066cc] border-[#0066cc]/30 shadow-sm shadow-[#0066cc]/10'
-                      : `${themeClasses.bg.tertiary} ${themeClasses.text.tertiary} ${themeClasses.border.default} ${themeClasses.button.ghost}`
-                  }`}
-                >
-                  {strategy.replace(/([A-Z])/g, ' $1').trim()}
-                </button>
-              ))}
+        {/* Section Tabs - Linked to selected objective */}
+        <div className={`px-8 border-t transition-colors ${themeClasses.border.default}`}>
+          <div className="flex items-center space-x-4">
+            {/* Objective indicator */}
+            <div className={`px-3 py-1 rounded-lg border font-mono text-xs uppercase tracking-wider ${
+              theme === 'dark'
+                ? 'bg-[#00ff88]/10 border-[#00ff88]/30 text-[#00ff88]'
+                : 'bg-[#0066cc]/10 border-[#0066cc]/30 text-[#0066cc]'
+            }`}>
+              {objectiveLabels[selectedObjective]}
             </div>
-            {portfolioAnalysis.homogeneity.isHomogeneous && (
-              <div className={`flex items-center space-x-2 text-xs font-mono transition-colors ${
-                theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'
-              }`}>
-                <CheckCircle size={12} />
-                <span>HOMOGENEOUS_PORTFOLIO ({Math.round(portfolioAnalysis.homogeneity.homogeneityScore * 100)}%)</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Objectives & Navigation */}
-        <div className={`w-64 border-r overflow-y-auto transition-colors ${themeClasses.border.default} ${themeClasses.bg.secondary}`}>
-          <div className="p-4">
-            <h3 className={`text-xs font-bold font-mono uppercase tracking-wider mb-4 transition-colors ${themeClasses.text.primary}`}>OBJECTIVES</h3>
-            <div className="space-y-1">
-              {Object.values(DnshObjective).map(obj => {
-                const stats = objectiveStats[obj];
-                const isActive = selectedObjective === obj;
+            
+            {/* Tabs for current objective */}
+            <div className="flex items-center space-x-1 overflow-x-auto flex-1">
+              {availableTabs.map(tab => {
+                // Calcular datos faltantes para mostrar badge en overview/checklist
+                const missingCount = (tab === 'overview' || tab === 'checklist')
+                  ? (() => {
+                      const missing = identifyMissingData(operation, selectedObjective);
+                      return missing.critical + missing.important;
+                    })()
+                  : 0;
                 
                 return (
                   <button
-                    key={obj}
-                    onClick={() => setSelectedObjective(obj)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer active:scale-[0.98] ${
-                      isActive
+                    key={tab}
+                    onClick={() => {
+                      // Auto-select first asset if trying to access asset-specific tab
+                      const requiresAssetView = ['checklist', 'materialityAssessment', 'adaptationDetails'].includes(tab);
+                      
+                      if (requiresAssetView && !selectedAssetId && operation.assets.length > 0) {
+                        setSelectedAssetId(operation.assets[0].id);
+                      }
+                      
+                      setActiveTab(tab);
+                    }}
+                    className={`px-4 py-2 text-xs font-mono uppercase tracking-wider transition-all cursor-pointer active:scale-[0.95] whitespace-nowrap flex items-center space-x-2 border-b-2 relative ${
+                      activeTab === tab
+                        ? theme === 'dark'
+                          ? 'text-[#00ff88] border-[#00ff88] bg-[#00ff88]/5'
+                          : 'text-[#0066cc] border-[#0066cc] bg-[#0066cc]/5'
+                        : `${themeClasses.text.tertiary} border-transparent hover:${themeClasses.text.secondary}`
+                    }`}
+                  >
+                    {tabIcons[tab]}
+                    <span>{tabLabels[tab]}</span>
+                    {(tab === 'overview' || tab === 'checklist') && missingCount > 0 && (
+                      <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                        activeTab === tab
+                          ? theme === 'dark'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-white/20 text-white'
+                          : theme === 'dark'
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-amber-500 text-white'
+                      }`}>
+                        {missingCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Assets List (Always Visible) */}
+        <div className={`w-72 border-r overflow-hidden flex flex-col transition-colors ${themeClasses.border.default} ${themeClasses.bg.secondary}`}>
+          {/* Assets Header */}
+          <div className={`p-4 border-b ${themeClasses.border.default} flex-shrink-0`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className={`text-xs font-bold font-mono uppercase tracking-wider transition-colors ${themeClasses.text.primary}`}>
+                ASSETS ({operation.assets.length})
+              </h3>
+              {selectedAssetId && (
+                <button
+                  onClick={() => {
+                    setSelectedAssetId(null);
+                    setActiveTab('overview');
+                  }}
+                  className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded transition-all ${themeClasses.button.ghost}`}
+                  title="Ver Portfolio Completo"
+                >
+                  PORTFOLIO
+                </button>
+              )}
+            </div>
+            
+            {/* Quick Stats */}
+            <div className={`grid grid-cols-2 gap-2 text-[10px] font-mono ${themeClasses.text.tertiary}`}>
+              <div>
+                <span className="uppercase tracking-wider">EVALUATED:</span>{' '}
+                <span className={themeClasses.text.secondary}>{portfolioAnalysis.evaluatedAssets}</span>
+              </div>
+              <div>
+                <span className="uppercase tracking-wider">COMPLIANT:</span>{' '}
+                <span className={theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'}>
+                  {operation.assets.filter(a => {
+                    // Only count as Compliant if ALL objectives are actually Compliant
+                    // This means: each objective must be either:
+                    // 1. "Compliant" (with checklist completed), OR
+                    // 2. Substantial contribution (exempt, counts as Compliant)
+                    const allObjectives = Object.values(DnshObjective);
+                    const allStatuses = allObjectives.map(obj => {
+                      const status = getAssetObjectiveStatus(a, obj, operation.substantialContributionId);
+                      // Check if this objective is substantial contribution
+                      const isSubstantial = 
+                        a.attributes.substantialContribution === obj ||
+                        operation.substantialContributionId === obj;
+                      // If substantial contribution, it's exempt and counts as Compliant
+                      if (isSubstantial) return 'Compliant';
+                      return status;
+                    });
+                    // All must be Compliant, no Non-Compliant or Conditional
+                    return allStatuses.every(s => s === 'Compliant') && 
+                           !allStatuses.some(s => s === 'Non-Compliant' || s === 'Conditional');
+                  }).length}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Assets List */}
+          <div className={`flex-1 overflow-y-auto ${themeClasses.scrollbar.track} ${themeClasses.scrollbar.thumb}`}>
+            <div className="p-2 space-y-1">
+              {operation.assets.map(asset => {
+                const isSelected = selectedAssetId === asset.id;
+                const evaluation = asset.dnshEvaluation;
+                // Calculate overall status from individual objectives (more accurate than stored overallStatus)
+                const allObjectives = Object.values(DnshObjective);
+                const allStatuses = allObjectives.map(obj => 
+                  getAssetObjectiveStatus(asset, obj, operation.substantialContributionId)
+                );
+                const hasNonCompliant = allStatuses.some(s => s === 'Non-Compliant');
+                const hasConditional = allStatuses.some(s => s === 'Conditional');
+                const allCompliant = allStatuses.every(s => s === 'Compliant');
+                const allNotAssessed = allStatuses.every(s => s === 'Not Assessed');
+                
+                let overallStatus: 'Compliant' | 'Non-Compliant' | 'Conditional' | 'Not Assessed';
+                if (hasNonCompliant) {
+                  overallStatus = 'Non-Compliant';
+                } else if (allCompliant) {
+                  overallStatus = 'Compliant';
+                } else if (hasConditional) {
+                  overallStatus = 'Conditional';
+                } else if (allNotAssessed) {
+                  overallStatus = 'Not Assessed';
+                } else {
+                  // Mixed: some Compliant, some Not Assessed = Conditional (needs completion)
+                  overallStatus = 'Conditional';
+                }
+                
+                const statusColor = getStatusColor(overallStatus);
+                const objectiveStatus = selectedAssetId === asset.id 
+                  ? getAssetObjectiveStatus(asset, selectedObjective, operation.substantialContributionId)
+                  : null;
+                
+                return (
+                  <button
+                    key={asset.id}
+                    onClick={() => {
+                      setSelectedAssetId(asset.id);
+                      // Auto-switch to checklist if coming from Portfolio view
+                      if (!selectedAssetId && availableTabs.includes('checklist')) {
+                        setActiveTab('checklist');
+                      }
+                    }}
+                    className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer active:scale-[0.98] group ${
+                      isSelected
                         ? theme === 'dark'
                           ? 'bg-[#00ff88]/10 border-[#00ff88]/30 text-white shadow-lg shadow-[#00ff88]/10'
                           : 'bg-[#0066cc]/10 border-[#0066cc]/30 text-gray-900 shadow-lg shadow-[#0066cc]/10'
@@ -421,100 +564,60 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
                             theme === 'dark'
                               ? 'hover:text-white hover:border-[#00ff88]/20 hover:bg-[#111111]'
                               : 'hover:text-gray-900 hover:border-[#0066cc]/20 hover:bg-gray-50'
-                          } active:${themeClasses.bg.secondary}`
+                          }`
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-mono uppercase tracking-wider">{objectiveLabels[obj]}</span>
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${getStatusColor(
-                        stats.totalAssessed > 0 
-                          ? (stats.compliant === stats.totalAssessed ? 'Compliant' : 
-                             stats.nonCompliant > 0 ? 'Non-Compliant' : 'Conditional')
-                          : 'Not Assessed'
-                      ).split(' ')[0]} ${getStatusColor(
-                        stats.totalAssessed > 0 
-                          ? (stats.compliant === stats.totalAssessed ? 'Compliant' : 
-                             stats.nonCompliant > 0 ? 'Non-Compliant' : 'Conditional')
-                          : 'Not Assessed'
-                      ).split(' ')[1]}`}>
-                        {stats.compliant}/{stats.totalAssessed}
+                    {/* Asset Name & Status */}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-mono uppercase tracking-wider truncate flex-1 ${isSelected ? themeClasses.text.primary : ''}`}>
+                        {asset.name.replace(/\s/g, '_')}
+                      </span>
+                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0 ml-2 ${statusColor}`}>
+                        {overallStatus.replace(/\s/g, '_')}
                       </span>
                     </div>
-                    <div className={`w-full rounded-full h-1 mt-2 transition-colors ${themeClasses.border.default} bg-opacity-20`} style={{ backgroundColor: theme === 'dark' ? '#1a1a1a' : '#e5e7eb' }}>
-                      <div 
-                        className={`h-1 rounded-full transition-colors ${
-                          stats.progress === 100 
-                            ? theme === 'dark' ? 'bg-[#00ff88]' : 'bg-[#0066cc]'
-                            : theme === 'dark' ? 'bg-[#ffb800]' : 'bg-[#ff9500]'
-                        }`}
-                        style={{ width: `${stats.progress}%` }}
-                      />
+                    
+                    {/* Asset Type & Value */}
+                    <div className={`text-[10px] font-mono mb-2 ${themeClasses.text.tertiary}`}>
+                      <div className="truncate">{asset.assetType}</div>
+                      <div>€{(asset.exposedValue / 1000000).toFixed(1)}M</div>
                     </div>
-                    <div className={`text-[10px] font-mono mt-1 transition-colors ${themeClasses.text.tertiary}`}>
-                      {stats.progress}% COMPLIANT
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          
-          {/* Display Sections Toggle */}
-          <div className={`p-4 border-t transition-colors ${themeClasses.border.default}`}>
-            <h3 className={`text-xs font-bold font-mono uppercase tracking-wider mb-3 transition-colors ${themeClasses.text.primary}`}>DISPLAY_SECTIONS</h3>
-            <div className="space-y-2">
-              {Object.entries(showSections).map(([key, value]) => {
-                // Map friendly labels
-                const labelMap: Record<string, string> = {
-                  overview: 'OVERVIEW',
-                  substantialContribution: 'SUBSTANTIAL_CONTRIBUTION',
-                  objectiveEvaluations: 'OBJECTIVE_EVALUATIONS',
-                  checklist: 'CHECKLIST',
-                  evidence: 'EVIDENCE',
-                  materialityAssessment: 'MATERIALITY_ASSESSMENT',
-                  adaptationDetails: 'ADAPTATION_DETAILS'
-                };
-                
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      
-                      // Special handling for sections that require Asset view
-                      const requiresAssetView = ['materialityAssessment', 'checklist', 'evidence', 'adaptationDetails'].includes(key);
-                      
-                      if (requiresAssetView && viewMode !== 'Asset') {
-                        // Switch to Asset view and select first asset if none selected
-                        if (!selectedAssetId && operation.assets.length > 0) {
-                          setSelectedAssetId(operation.assets[0].id);
-                        }
-                        setViewMode('Asset');
-                      }
-                      
-                      toggleSection(key as keyof typeof showSections);
-                    }}
-                    onMouseDown={(e) => {
-                      // Ensure click is handled
-                      e.stopPropagation();
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded text-xs font-mono uppercase tracking-wider transition-all cursor-pointer active:scale-[0.98] pointer-events-auto relative z-10 focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50 ${
-                      value 
-                        ? 'bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 hover:bg-[#00ff88]/15 shadow-sm shadow-[#00ff88]/10' 
-                        : `${themeClasses.bg.tertiary} ${themeClasses.text.tertiary} ${themeClasses.border.default} ${
-                            theme === 'dark'
-                              ? 'hover:text-white hover:border-[#1a1a1a] hover:bg-[#0a0a0a]'
-                              : 'hover:text-gray-900 hover:border-gray-300 hover:bg-gray-50'
-                          } active:${themeClasses.bg.secondary}`
-                    }`}
-                    style={{ pointerEvents: 'auto' }}
-                    aria-label={`${value ? 'Hide' : 'Show'} ${labelMap[key] || key.replace(/([A-Z])/g, ' $1').trim().toUpperCase()}`}
-                    aria-pressed={value}
-                  >
-                    <span>{labelMap[key] || key.replace(/([A-Z])/g, ' $1').trim().toUpperCase()}</span>
-                    {value ? <Eye size={12} aria-hidden="true" /> : <EyeOff size={12} aria-hidden="true" />}
+                    
+                    {/* Current Objective Status (if selected) */}
+                    {isSelected && objectiveStatus && (
+                      <div className={`mt-2 pt-2 border-t ${themeClasses.border.default}`}>
+                        <div className={`text-[9px] font-mono uppercase tracking-wider ${themeClasses.text.tertiary}`}>
+                          {objectiveLabels[selectedObjective]}:
+                        </div>
+                        <div className={`text-[10px] font-mono mt-0.5 ${getStatusColor(objectiveStatus)}`}>
+                          {objectiveStatus.replace(/\s/g, '_')}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Progress Bar */}
+                    {evaluation && (
+                      <div className={`w-full rounded-full h-1 mt-2 ${themeClasses.bg.tertiary}`}>
+                        <div 
+                          className={`h-1 rounded-full transition-colors ${
+                            overallStatus === 'Compliant'
+                              ? theme === 'dark' ? 'bg-[#00ff88]' : 'bg-[#0066cc]'
+                              : overallStatus === 'Non-Compliant'
+                              ? 'bg-red-500'
+                              : theme === 'dark' ? 'bg-[#ffb800]' : 'bg-[#ff9500]'
+                          }`}
+                          style={{ 
+                            width: `${(() => {
+                              const allStatuses = Object.values(DnshObjective).map(obj => 
+                                getAssetObjectiveStatus(asset, obj, operation.substantialContributionId)
+                              );
+                              const compliant = allStatuses.filter(s => s === 'Compliant').length;
+                              return allStatuses.length > 0 ? (compliant / allStatuses.length) * 100 : 0;
+                            })()}%` 
+                          }}
+                        />
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -522,78 +625,150 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
           </div>
         </div>
         
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Overview Section */}
-          {showSections.overview && (
-            <div className={`mb-6 border rounded-xl p-6 transition-colors ${themeClasses.card.bg} ${themeClasses.card.border}`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-lg font-bold font-mono uppercase tracking-wider transition-colors ${themeClasses.text.primary}`}>PORTFOLIO_OVERVIEW</h2>
-                <button
-                  onClick={() => toggleSection('overview')}
-                  className={`transition-colors ${themeClasses.text.tertiary} ${themeClasses.button.ghost}`}
-                >
-                  <ChevronUp size={20} />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-4 gap-4">
-                <div className={`p-4 rounded-lg border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
-                  <div className={`text-xs font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>TOTAL_ASSETS</div>
-                  <div className={`text-2xl font-bold font-mono transition-colors ${themeClasses.text.primary}`}>{operation.assets.length}</div>
-                </div>
-                <div className={`p-4 rounded-lg border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
-                  <div className={`text-xs font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>EVALUATED</div>
-                  <div className={`text-2xl font-bold font-mono transition-colors ${themeClasses.text.primary}`}>{portfolioAnalysis.evaluatedAssets}</div>
-                </div>
-                <div className={`p-4 rounded-lg border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
-                  <div className={`text-xs font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>HOMOGENEITY</div>
-                  <div className={`text-2xl font-bold font-mono transition-colors ${
-                    theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'
-                  }`}>
-                    {Math.round(portfolioAnalysis.homogeneity.homogeneityScore * 100)}%
-                  </div>
-                </div>
-                <div className={`p-4 rounded-lg border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
-                  <div className={`text-xs font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>GROUPS</div>
-                  <div className={`text-2xl font-bold font-mono transition-colors ${themeClasses.text.primary}`}>{portfolioAnalysis.groups.length}</div>
-                </div>
+        {/* Middle Sidebar - Objectives (Only when asset selected) */}
+        {selectedAssetId && (
+          <div className={`w-64 border-r overflow-y-auto transition-colors ${themeClasses.border.default} ${themeClasses.bg.secondary}`}>
+            <div className="p-4">
+              <h3 className={`text-xs font-bold font-mono uppercase tracking-wider mb-4 transition-colors ${themeClasses.text.primary}`}>OBJECTIVES</h3>
+              <div className="space-y-1">
+                {Object.values(DnshObjective).map(obj => {
+                  const asset = operation.assets.find(a => a.id === selectedAssetId);
+                  const assetStatus = asset ? getAssetObjectiveStatus(asset, obj, operation.substantialContributionId) : 'Not Assessed';
+                  const isSubstantial = asset && (
+                    asset.attributes.substantialContribution === obj ||
+                    operation.substantialContributionId === obj
+                  );
+                  const isActive = selectedObjective === obj;
+                  
+                  return (
+                    <button
+                      key={obj}
+                      onClick={() => setSelectedObjective(obj)}
+                      className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer active:scale-[0.98] ${
+                        isActive
+                          ? theme === 'dark'
+                            ? 'bg-[#00ff88]/10 border-[#00ff88]/30 text-white shadow-lg shadow-[#00ff88]/10'
+                            : 'bg-[#0066cc]/10 border-[#0066cc]/30 text-gray-900 shadow-lg shadow-[#0066cc]/10'
+                          : `${themeClasses.bg.tertiary} ${themeClasses.border.default} ${themeClasses.text.tertiary} ${
+                              theme === 'dark'
+                                ? 'hover:text-white hover:border-[#00ff88]/20 hover:bg-[#111111]'
+                                : 'hover:text-gray-900 hover:border-[#0066cc]/20 hover:bg-gray-50'
+                            } active:${themeClasses.bg.secondary}`
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-mono uppercase tracking-wider">{objectiveLabels[obj]}</span>
+                          {isSubstantial && (
+                            <span className={`text-[8px] font-mono px-1 py-0.5 rounded ${
+                              theme === 'dark'
+                                ? 'bg-[#00a8ff]/20 text-[#00a8ff] border border-[#00a8ff]/30'
+                                : 'bg-blue-100 text-blue-700 border border-blue-200'
+                            }`}>
+                              SUBSTANTIAL
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${getStatusColor(assetStatus)}`}>
+                          {assetStatus.replace(/\s/g, '_')}
+                        </span>
+                      </div>
+                      <div className={`w-full rounded-full h-1 mt-2 transition-colors ${themeClasses.border.default} bg-opacity-20`} style={{ backgroundColor: theme === 'dark' ? '#1a1a1a' : '#e5e7eb' }}>
+                        <div 
+                          className={`h-1 rounded-full transition-colors ${
+                            assetStatus === 'Compliant'
+                              ? theme === 'dark' ? 'bg-[#00ff88]' : 'bg-[#0066cc]'
+                              : assetStatus === 'Non-Compliant'
+                              ? 'bg-red-500'
+                              : assetStatus === 'Conditional'
+                              ? theme === 'dark' ? 'bg-[#ffb800]' : 'bg-[#ff9500]'
+                              : 'bg-transparent'
+                          }`}
+                          style={{ width: `${assetStatus === 'Compliant' ? 100 : assetStatus === 'Non-Compliant' ? 0 : assetStatus === 'Conditional' ? 50 : 0}%` }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
+          </div>
+        )}
+        
+        {/* Main Content - Adapts based on selected asset */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Portfolio Overview (when no asset selected) */}
+          {!selectedAssetId && activeTab === 'overview' && (
+            <>
+              {/* Objective-specific overview */}
+              <div className={`mb-6 border rounded-xl p-6 transition-colors ${themeClasses.card.bg} ${themeClasses.card.border}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-lg font-bold font-mono uppercase tracking-wider transition-colors ${themeClasses.text.primary}`}>
+                    {objectiveLabels[selectedObjective]} - PORTFOLIO_OVERVIEW
+                  </h2>
+                  <div className={`px-3 py-1 rounded-lg border font-mono text-xs uppercase tracking-wider ${
+                    theme === 'dark'
+                      ? 'bg-[#00ff88]/10 border-[#00ff88]/30 text-[#00ff88]'
+                      : 'bg-[#0066cc]/10 border-[#0066cc]/30 text-[#0066cc]'
+                  }`}>
+                    {objectiveStats[selectedObjective].compliant}/{objectiveStats[selectedObjective].totalAssessed} COMPLIANT
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className={`p-4 rounded-lg border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
+                    <div className={`text-xs font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>TOTAL_ASSETS</div>
+                    <div className={`text-2xl font-bold font-mono transition-colors ${themeClasses.text.primary}`}>{operation.assets.length}</div>
+                  </div>
+                  <div className={`p-4 rounded-lg border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
+                    <div className={`text-xs font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>ASSESSED</div>
+                    <div className={`text-2xl font-bold font-mono transition-colors ${themeClasses.text.primary}`}>{objectiveStats[selectedObjective].totalAssessed}</div>
+                  </div>
+                  <div className={`p-4 rounded-lg border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
+                    <div className={`text-xs font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>COMPLIANT</div>
+                    <div className={`text-2xl font-bold font-mono transition-colors ${
+                      theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'
+                    }`}>
+                      {objectiveStats[selectedObjective].compliant}
+                    </div>
+                  </div>
+                  <div className={`p-4 rounded-lg border transition-colors ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
+                    <div className={`text-xs font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>PROGRESS</div>
+                    <div className={`text-2xl font-bold font-mono transition-colors ${
+                      theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'
+                    }`}>
+                      {objectiveStats[selectedObjective].progress}%
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Progress bar */}
+                <div className={`w-full rounded-full h-2 transition-colors ${themeClasses.bg.tertiary}`}>
+                  <div 
+                    className={`h-2 rounded-full transition-colors ${
+                      theme === 'dark' ? 'bg-[#00ff88]' : 'bg-[#0066cc]'
+                    }`}
+                    style={{ width: `${objectiveStats[selectedObjective].progress}%` }}
+                  />
+                </div>
+              </div>
+              
+              {/* Portfolio View */}
+              <PortfolioView 
+                operation={operation}
+                selectedObjective={selectedObjective}
+                objectiveStats={objectiveStats}
+                getStatusColor={getStatusColor}
+                onSelectAsset={(id) => {
+                  setSelectedAssetId(id);
+                  setActiveTab('checklist');
+                }}
+              />
+            </>
           )}
           
-          {/* Portfolio/Group/Asset View */}
-          {viewMode === 'Portfolio' && (
-            <PortfolioView 
-              operation={operation}
-              selectedObjective={selectedObjective}
-              objectiveStats={objectiveStats}
-              getStatusColor={getStatusColor}
-              onSelectAsset={(id) => {
-                setSelectedAssetId(id);
-                setViewMode('Asset');
-              }}
-            />
-          )}
-          
-          {viewMode === 'Group' && (
-            <GroupView
-              groups={portfolioAnalysis.groups}
-              operation={operation}
-              selectedGroupId={selectedGroupId}
-              selectedObjective={selectedObjective}
-              groupEvaluation={groupEvaluation}
-              getStatusColor={getStatusColor}
-              onSelectGroup={(id) => setSelectedGroupId(id)}
-              onSelectAsset={(id) => {
-                setSelectedAssetId(id);
-                setViewMode('Asset');
-              }}
-            />
-          )}
-          
-          {viewMode === 'Asset' && selectedAssetId && (() => {
-            // Get current asset from operation state (ensures it updates when operation changes)
+          {/* Asset-specific tabs (when asset selected) */}
+          {selectedAssetId && activeTab === 'overview' && (() => {
             const currentAsset = operation.assets.find(a => a.id === selectedAssetId);
             if (!currentAsset) return null;
             
@@ -603,22 +778,137 @@ const DnshEvaluationEnhancedPage: React.FC<Props> = ({
                 operation={operation}
                 selectedObjective={selectedObjective}
                 getStatusColor={getStatusColor}
-                showChecklist={showSections.checklist}
-                showEvidence={showSections.evidence}
-                showMaterialityAssessment={showSections.materialityAssessment}
-                showAdaptationDetails={showSections.adaptationDetails}
+                showChecklist={false}
+                showEvidence={false}
+                showMaterialityAssessment={false}
+                showAdaptationDetails={false}
                 checklistAnswers={checklistAnswers}
                 onAnswersChange={setChecklistAnswers}
                 onSaveEvaluation={(evaluation) => handleSaveAssetEvaluation(selectedAssetId, evaluation)}
-              onSelectAsset={handleSelectAssetFromMap}
-              selectedHazardId={selectedHazardId}
-              onSelectHazard={setSelectedHazardId}
-              selectedAssetId={selectedAssetId}
-              onShowEvidenceModal={() => setShowEvidenceModal(true)}
-              theme={theme}
-            />
+                onSelectAsset={handleSelectAssetFromMap}
+                selectedHazardId={selectedHazardId}
+                onSelectHazard={setSelectedHazardId}
+                selectedAssetId={selectedAssetId}
+                onShowEvidenceModal={() => setShowEvidenceModal(true)}
+                theme={theme}
+              />
             );
           })()}
+          
+          {/* Evidence Tab - Available in all view modes */}
+          {activeTab === 'evidence' && (
+            <div className="h-full">
+              <EvidenceRegistry
+                operation={operation}
+                onAddEvidence={handleAddEvidence}
+                onDeleteEvidence={handleDeleteEvidence}
+              />
+            </div>
+          )}
+          
+          {/* Asset-specific tabs (when asset selected) */}
+          {selectedAssetId && (() => {
+            const currentAsset = operation.assets.find(a => a.id === selectedAssetId);
+            if (!currentAsset) return null;
+            
+            return (
+              <>
+                {/* Checklist Tab */}
+                {activeTab === 'checklist' && (
+                  <AssetView
+                    asset={currentAsset}
+                    operation={operation}
+                    selectedObjective={selectedObjective}
+                    getStatusColor={getStatusColor}
+                    showChecklist={true}
+                    showEvidence={false}
+                    showMaterialityAssessment={false}
+                    showAdaptationDetails={false}
+                    checklistAnswers={checklistAnswers}
+                    onAnswersChange={setChecklistAnswers}
+                    onSaveEvaluation={(evaluation) => handleSaveAssetEvaluation(selectedAssetId, evaluation)}
+                    onSelectAsset={handleSelectAssetFromMap}
+                    selectedHazardId={selectedHazardId}
+                    onSelectHazard={setSelectedHazardId}
+                    selectedAssetId={selectedAssetId}
+                    onShowEvidenceModal={() => setShowEvidenceModal(true)}
+                    theme={theme}
+                  />
+                )}
+                
+                {/* Evidence Tab */}
+                {activeTab === 'evidence' && (
+                  <AssetView
+                    asset={currentAsset}
+                    operation={operation}
+                    selectedObjective={selectedObjective}
+                    getStatusColor={getStatusColor}
+                    showChecklist={false}
+                    showEvidence={true}
+                    showMaterialityAssessment={false}
+                    showAdaptationDetails={false}
+                    checklistAnswers={checklistAnswers}
+                    onAnswersChange={setChecklistAnswers}
+                    onSaveEvaluation={(evaluation) => handleSaveAssetEvaluation(selectedAssetId, evaluation)}
+                    onSelectAsset={handleSelectAssetFromMap}
+                    selectedHazardId={selectedHazardId}
+                    onSelectHazard={setSelectedHazardId}
+                    selectedAssetId={selectedAssetId}
+                    onShowEvidenceModal={() => setShowEvidenceModal(true)}
+                    theme={theme}
+                  />
+                )}
+                
+                {/* Materiality Assessment Tab */}
+                {activeTab === 'materialityAssessment' && (
+                  <AssetView
+                    asset={currentAsset}
+                    operation={operation}
+                    selectedObjective={selectedObjective}
+                    getStatusColor={getStatusColor}
+                    showChecklist={false}
+                    showEvidence={false}
+                    showMaterialityAssessment={true}
+                    showAdaptationDetails={false}
+                    checklistAnswers={checklistAnswers}
+                    onAnswersChange={setChecklistAnswers}
+                    onSaveEvaluation={(evaluation) => handleSaveAssetEvaluation(selectedAssetId, evaluation)}
+                    onSelectAsset={handleSelectAssetFromMap}
+                    selectedHazardId={selectedHazardId}
+                    onSelectHazard={setSelectedHazardId}
+                    selectedAssetId={selectedAssetId}
+                    onShowEvidenceModal={() => setShowEvidenceModal(true)}
+                    theme={theme}
+                  />
+                )}
+                
+                {/* Adaptation Details Tab - Only for ADAPTATION objective */}
+                {activeTab === 'adaptationDetails' && selectedObjective === DnshObjective.ADAPTATION && (
+                  <AssetView
+                    asset={currentAsset}
+                    operation={operation}
+                    selectedObjective={selectedObjective}
+                    getStatusColor={getStatusColor}
+                    showChecklist={false}
+                    showEvidence={false}
+                    showMaterialityAssessment={false}
+                    showAdaptationDetails={true}
+                    checklistAnswers={checklistAnswers}
+                    onAnswersChange={setChecklistAnswers}
+                    onSaveEvaluation={(evaluation) => handleSaveAssetEvaluation(selectedAssetId, evaluation)}
+                    onSelectAsset={handleSelectAssetFromMap}
+                    selectedHazardId={selectedHazardId}
+                    onSelectHazard={setSelectedHazardId}
+                    selectedAssetId={selectedAssetId}
+                    onShowEvidenceModal={() => setShowEvidenceModal(true)}
+                    theme={theme}
+                  />
+                )}
+                
+              </>
+            );
+          })()}
+          
         </div>
       </div>
       
@@ -684,7 +974,7 @@ const PortfolioView: React.FC<{
         <div className="space-y-2">
           {operation.assets.map(asset => {
               // Use centralized service for consistent status
-              const status = getAssetObjectiveStatus(asset, selectedObjective);
+              const status = getAssetObjectiveStatus(asset, selectedObjective, operation.substantialContributionId);
             
             return (
               <div
@@ -785,7 +1075,7 @@ const GroupView: React.FC<{
               <div className={`mt-4 space-y-2 border-t pt-4 transition-colors ${themeClasses.border.default}`}>
                 {groupAssets.map(asset => {
                   // Use centralized service for consistent status
-                  const status = getAssetObjectiveStatus(asset, selectedObjective);
+                  const status = getAssetObjectiveStatus(asset, selectedObjective, operation.substantialContributionId);
                   
                   return (
                     <div
@@ -869,14 +1159,14 @@ const AssetView: React.FC<{
   
   // Auto-determined scope state (fallback when manual scope not set) - Shared between Materiality Assessment and Adaptation Details
   const [autoDeterminedScopes, setAutoDeterminedScopes] = useState<Record<string, 'In Scope' | 'Out of Scope'>>({});
+  const [autoDeterminedScopesDetailed, setAutoDeterminedScopesDetailed] = useState<Record<string, ScopeDeterminationResult>>({});
   const [isDeterminingScopes, setIsDeterminingScopes] = useState(false);
   
-  // Determine scopes automatically if not manually set
+  // Determine scopes automatically - Always load detailed results for Materiality Assessment
   useEffect(() => {
-    const hasManualScopes = asset.attributes.adaptationHazardScope && 
-      Object.keys(asset.attributes.adaptationHazardScope).length > 0;
-    
-    if (!hasManualScopes && selectedObjective === DnshObjective.ADAPTATION) {
+    // Load detailed scopes for Materiality Assessment (always, to show justifications)
+    // Load even if manual scopes exist, to provide reference justifications
+    if (selectedObjective === DnshObjective.ADAPTATION || showMaterialityAssessment) {
       setIsDeterminingScopes(true);
       determineAllHazardScopes(asset, ClimateScenario.SSP2_45)
         .then(scopes => {
@@ -885,6 +1175,7 @@ const AssetView: React.FC<{
             simplified[hazardId] = result.scope;
           });
           setAutoDeterminedScopes(simplified);
+          setAutoDeterminedScopesDetailed(scopes);
         })
         .catch(err => {
           logger.error('Error determining hazard scopes', err, { component: 'DnshEvaluationEnhanced', action: 'determineHazardScopes', assetId: asset.id });
@@ -894,8 +1185,9 @@ const AssetView: React.FC<{
         });
     } else {
       setAutoDeterminedScopes({});
+      setAutoDeterminedScopesDetailed({});
     }
-  }, [asset.id, asset.attributes.adaptationHazardScope, selectedObjective]);
+  }, [asset.id, selectedObjective, showMaterialityAssessment]);
   
   // Calculate hazard scope status (use manual if available, otherwise use auto-determined) - Shared logic
   const hazardScopeStatus = useMemo(() => {
@@ -918,7 +1210,7 @@ const AssetView: React.FC<{
   }, [asset, autoDeterminedScopes]);
   
   // Use centralized service for status - This is the PRIMARY source of truth (from checklist)
-  const status = getAssetObjectiveStatus(asset, selectedObjective);
+              const status = getAssetObjectiveStatus(asset, selectedObjective, operation.substantialContributionId);
   
   // Check if checklist has been completed for this objective
   const hasChecklistEvaluation = asset.dnshEvaluation?.checklistAnswers?.[selectedObjective] && 
@@ -1396,47 +1688,218 @@ const AssetView: React.FC<{
             </div>
           </div>
           
-          {/* Scenario Comparison Section */}
-          <div className={`p-4 border-t flex-shrink-0 transition-colors ${themeClasses.border.default}`}>
-            <h5 className={`text-xs font-bold font-mono uppercase tracking-wider mb-3 transition-colors ${themeClasses.text.primary}`}>
-              ESCENARIOS_DE_REFERENCIA_VS_MATERIALIDAD
-            </h5>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className={`p-4 rounded-lg border transition-all ${themeClasses.bg.tertiary} ${themeClasses.border.default} ${
-                theme === 'dark' ? 'hover:border-[#00ff88]/30' : 'hover:border-green-300'
-              }`}>
-                <div className={`text-[10px] font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>SSP1-2.6</div>
-                <div className={`text-sm font-bold font-mono transition-colors ${
-                  theme === 'dark' ? 'text-[#00ff88]' : 'text-green-600'
-                }`}>OPTIMISTIC</div>
-                <div className={`text-[10px] font-mono mt-1 transition-colors ${themeClasses.text.tertiary}`}>ΔT_2050: +1.5°C</div>
-                <div className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary}`}>SLR_2050: +15CM</div>
+          {/* Hazard Scope Details Section - Replaces Scenario Comparison */}
+          {selectedObjective === DnshObjective.ADAPTATION && (
+            <div className={`p-4 border-t flex-shrink-0 transition-colors ${themeClasses.border.default}`}>
+              <div className="flex items-center justify-between mb-3">
+                <h5 className={`text-xs font-bold font-mono uppercase tracking-wider transition-colors ${themeClasses.text.primary}`}>
+                  HAZARD_SCOPE_DETAILS_&_JUSTIFICATION
+                </h5>
+                <div className={`text-[9px] font-mono uppercase tracking-wider ${themeClasses.text.tertiary}`}>
+                  {Object.values(hazardScopeStatus).filter(s => s !== 'Not Set').length} HAZARDS_EVALUADOS
+                </div>
               </div>
-              <div className={`p-4 rounded-lg border transition-all ${themeClasses.bg.tertiary} ${themeClasses.border.default} ${
-                theme === 'dark' ? 'hover:border-[#00a8ff]/30' : 'hover:border-blue-300'
-              }`}>
-                <div className={`text-[10px] font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>SSP2-4.5</div>
-                <div className={`text-sm font-bold font-mono transition-colors ${
-                  theme === 'dark' ? 'text-[#00a8ff]' : 'text-blue-600'
-                }`}>MODERATE</div>
-                <div className={`text-[10px] font-mono mt-1 transition-colors ${themeClasses.text.tertiary}`}>ΔT_2050: +2.0°C</div>
-                <div className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary}`}>SLR_2050: +20CM</div>
+              
+              {isDeterminingScopes ? (
+                <div className={`text-center py-8 ${themeClasses.text.tertiary}`}>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00ff88] mx-auto mb-2"></div>
+                  <p className="text-xs font-mono uppercase tracking-wider">DETERMINING_SCOPES...</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                  {EU_TAXONOMY_HAZARDS.map(hazard => {
+                    const scopeStatus = hazardScopeStatus[hazard.id];
+                    const hasManualScope = asset.attributes.adaptationHazardScope?.[hazard.id];
+                    // Always try to get detailed result, even for manual scopes (for reference)
+                    const detailedResult = autoDeterminedScopesDetailed[hazard.id];
+                    
+                    const isInScope = scopeStatus === 'In Scope';
+                    const isOutOfScope = scopeStatus === 'Out of Scope';
+                    
+                    if (scopeStatus === 'Not Set') return null;
+                    
+                    return (
+                      <div
+                        key={hazard.id}
+                        className={`p-4 rounded-lg border transition-all ${
+                          isInScope
+                            ? theme === 'dark'
+                              ? 'bg-[#00ff88]/10 border-[#00ff88]/30'
+                              : 'bg-green-50 border-green-200'
+                            : theme === 'dark'
+                              ? 'bg-[#666666]/20 border-[#666666]/30'
+                              : 'bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center space-x-2 flex-1">
+                            <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                              isInScope ? 'bg-[#00ff88]' : 'bg-[#666666]'
+                            }`}></div>
+                            <h6 className={`text-xs font-bold font-mono uppercase tracking-wider ${themeClasses.text.primary}`}>
+                              {hazard.name.replace(/\s/g, '_')} ({hazard.code})
+                            </h6>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase ${
+                              isInScope
+                                ? theme === 'dark'
+                                  ? 'bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/30'
+                                  : 'bg-green-100 text-green-700 border border-green-200'
+                                : theme === 'dark'
+                                  ? 'bg-[#666666]/20 text-[#666666] border border-[#666666]/30'
+                                  : 'bg-gray-100 text-gray-600 border border-gray-200'
+                            }`}>
+                              {scopeStatus.replace(/\s/g, '_')}
+                            </span>
+                            {hasManualScope && (
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase ${
+                                theme === 'dark'
+                                  ? 'bg-[#00a8ff]/20 text-[#00a8ff] border border-[#00a8ff]/30'
+                                  : 'bg-blue-100 text-blue-700 border border-blue-200'
+                              }`}>
+                                MANUAL
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Detailed Justification */}
+                        {detailedResult && (
+                          <div className="mt-3 space-y-2">
+                            <div>
+                              <p className={`text-[10px] font-mono uppercase tracking-wider mb-1 ${themeClasses.text.secondary}`}>
+                                JUSTIFICACION:
+                              </p>
+                              <p className={`text-xs font-mono leading-relaxed ${themeClasses.text.primary}`}>
+                                {detailedResult.reasoning}
+                              </p>
+                            </div>
+                            
+                            {detailedResult.dataSources && detailedResult.dataSources.length > 0 && (
+                              <div>
+                                <p className={`text-[10px] font-mono uppercase tracking-wider mb-1 ${themeClasses.text.secondary}`}>
+                                  FUENTES_DE_DATOS:
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {detailedResult.dataSources.map((source, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase ${
+                                        theme === 'dark'
+                                          ? 'bg-[#1a1a1a] text-[#999999] border border-[#2a2a2a]'
+                                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                                      }`}
+                                    >
+                                      {source}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {detailedResult.applicableConditions && detailedResult.applicableConditions.length > 0 && (
+                              <div>
+                                <p className={`text-[10px] font-mono uppercase tracking-wider mb-1 ${themeClasses.text.secondary}`}>
+                                  CONDICIONES_APLICABLES:
+                                </p>
+                                <ul className="list-disc list-inside space-y-0.5">
+                                  {detailedResult.applicableConditions.map((condition, idx) => (
+                                    <li key={idx} className={`text-[10px] font-mono ${themeClasses.text.tertiary}`}>
+                                      {condition}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center space-x-2 mt-2 pt-2 border-t border-[#1a1a1a]">
+                              <span className={`text-[9px] font-mono uppercase tracking-wider ${themeClasses.text.tertiary}`}>
+                                CONFIDENCE:
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase ${
+                                detailedResult.confidence === 'High'
+                                  ? theme === 'dark'
+                                    ? 'bg-[#00ff88]/20 text-[#00ff88]'
+                                    : 'bg-green-100 text-green-700'
+                                  : detailedResult.confidence === 'Medium'
+                                    ? theme === 'dark'
+                                      ? 'bg-[#ffb800]/20 text-[#ffb800]'
+                                      : 'bg-amber-100 text-amber-700'
+                                    : theme === 'dark'
+                                      ? 'bg-[#666666]/20 text-[#666666]'
+                                      : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {detailedResult.confidence.toUpperCase()}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {hasManualScope && !detailedResult && (
+                          <div className="mt-3">
+                            <p className={`text-[10px] font-mono uppercase tracking-wider ${themeClasses.text.tertiary}`}>
+                              SCOPE_DETERMINADO_MANUALMENTE • JUSTIFICACION_DISPONIBLE_EN_MAPA
+                            </p>
+                          </div>
+                        )}
+                        
+                        {!detailedResult && !hasManualScope && (
+                          <div className="mt-3">
+                            <p className={`text-[10px] font-mono uppercase tracking-wider ${themeClasses.text.tertiary}`}>
+                              CARGANDO_JUSTIFICACION...
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Scenario Comparison Section - Only show if not Adaptation objective */}
+          {selectedObjective !== DnshObjective.ADAPTATION && (
+            <div className={`p-4 border-t flex-shrink-0 transition-colors ${themeClasses.border.default}`}>
+              <h5 className={`text-xs font-bold font-mono uppercase tracking-wider mb-3 transition-colors ${themeClasses.text.primary}`}>
+                ESCENARIOS_DE_REFERENCIA_VS_MATERIALIDAD
+              </h5>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className={`p-4 rounded-lg border transition-all ${themeClasses.bg.tertiary} ${themeClasses.border.default} ${
+                  theme === 'dark' ? 'hover:border-[#00ff88]/30' : 'hover:border-green-300'
+                }`}>
+                  <div className={`text-[10px] font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>SSP1-2.6</div>
+                  <div className={`text-sm font-bold font-mono transition-colors ${
+                    theme === 'dark' ? 'text-[#00ff88]' : 'text-green-600'
+                  }`}>OPTIMISTIC</div>
+                  <div className={`text-[10px] font-mono mt-1 transition-colors ${themeClasses.text.tertiary}`}>ΔT_2050: +1.5°C</div>
+                  <div className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary}`}>SLR_2050: +15CM</div>
+                </div>
+                <div className={`p-4 rounded-lg border transition-all ${themeClasses.bg.tertiary} ${themeClasses.border.default} ${
+                  theme === 'dark' ? 'hover:border-[#00a8ff]/30' : 'hover:border-blue-300'
+                }`}>
+                  <div className={`text-[10px] font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>SSP2-4.5</div>
+                  <div className={`text-sm font-bold font-mono transition-colors ${
+                    theme === 'dark' ? 'text-[#00a8ff]' : 'text-blue-600'
+                  }`}>MODERATE</div>
+                  <div className={`text-[10px] font-mono mt-1 transition-colors ${themeClasses.text.tertiary}`}>ΔT_2050: +2.0°C</div>
+                  <div className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary}`}>SLR_2050: +20CM</div>
+                </div>
+                <div className={`p-4 rounded-lg border transition-all ${themeClasses.bg.tertiary} ${themeClasses.border.default} ${
+                  theme === 'dark' ? 'hover:border-red-500/30' : 'hover:border-red-300'
+                }`}>
+                  <div className={`text-[10px] font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>SSP5-8.5</div>
+                  <div className={`text-sm font-bold font-mono transition-colors ${
+                    theme === 'dark' ? 'text-red-500' : 'text-red-600'
+                  }`}>PESSIMISTIC</div>
+                  <div className={`text-[10px] font-mono mt-1 transition-colors ${themeClasses.text.tertiary}`}>ΔT_2050: +2.7°C</div>
+                  <div className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary}`}>SLR_2050: +30CM</div>
+                </div>
               </div>
-              <div className={`p-4 rounded-lg border transition-all ${themeClasses.bg.tertiary} ${themeClasses.border.default} ${
-                theme === 'dark' ? 'hover:border-red-500/30' : 'hover:border-red-300'
-              }`}>
-                <div className={`text-[10px] font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.tertiary}`}>SSP5-8.5</div>
-                <div className={`text-sm font-bold font-mono transition-colors ${
-                  theme === 'dark' ? 'text-red-500' : 'text-red-600'
-                }`}>PESSIMISTIC</div>
-                <div className={`text-[10px] font-mono mt-1 transition-colors ${themeClasses.text.tertiary}`}>ΔT_2050: +2.7°C</div>
-                <div className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary}`}>SLR_2050: +30CM</div>
+              <div className={`mt-3 text-[10px] font-mono italic transition-colors ${themeClasses.text.tertiary}`}>
+                COMPARACION_VS_UMBRALES_DE_MATERIALIDAD_DEFINIDOS_POR_OBJETIVO_DNSH
               </div>
             </div>
-            <div className={`mt-3 text-[10px] font-mono italic transition-colors ${themeClasses.text.tertiary}`}>
-              COMPARACION_VS_UMBRALES_DE_MATERIALIDAD_DEFINIDOS_POR_OBJETIVO_DNSH
-            </div>
-          </div>
+          )}
             </div>
           )}
           
@@ -1712,7 +2175,7 @@ const AdaptationDetailsContent: React.FC<{
     const allMeasures = [...new Set(Object.values(existingMeasuresByHazard).flat())];
     
     // Get primary status from checklist (if available)
-    const checklistStatus = getAssetObjectiveStatus(asset, DnshObjective.ADAPTATION);
+    const checklistStatus = getAssetObjectiveStatus(asset, DnshObjective.ADAPTATION, operation.substantialContributionId);
     const hasChecklist = currentEvaluation.checklistAnswers?.[DnshObjective.ADAPTATION] && 
       Object.keys(currentEvaluation.checklistAnswers[DnshObjective.ADAPTATION]).length > 0;
     
@@ -1749,22 +2212,95 @@ const AdaptationDetailsContent: React.FC<{
     return (
       <div className={`border rounded-xl overflow-hidden flex flex-col transition-colors ${themeClasses.card.bg} ${themeClasses.card.border}`}>
         <div className={`p-4 border-b flex-shrink-0 transition-colors ${themeClasses.border.default}`}>
-          <h4 className={`text-sm font-bold font-mono uppercase tracking-wider mb-1 transition-colors ${themeClasses.text.primary}`}>
-            ADAPTATION_DETAILS
-          </h4>
-          <p className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary}`}>
-            SELECCIONA_UN_HAZARD_IN_SCOPE_EN_MATERIALITY_ASSESSMENT
-          </p>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center">
-            <AlertTriangle size={48} className={`mx-auto mb-4 ${themeClasses.text.tertiary}`} />
-            <p className={`text-sm font-bold font-mono uppercase tracking-wider mb-2 ${themeClasses.text.tertiary}`}>
-              SELECCIONA_HAZARD
-            </p>
-            <p className={`text-xs font-mono uppercase ${themeClasses.text.tertiary}`}>
-              CLICK_EN_UN_HAZARD_IN_SCOPE_EN_LA_SECCION_MATERIALITY_ASSESSMENT
-            </p>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex-1">
+              <h4 className={`text-sm font-bold font-mono uppercase tracking-wider transition-colors ${themeClasses.text.primary}`}>
+                ADAPTATION_DETAILS
+              </h4>
+              <p className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary} mb-2`}>
+                SELECCIONA_HAZARD_PARA_VINCULAR_MEDIDAS
+              </p>
+            </div>
+          </div>
+          
+          {/* Hazard Selector */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className={`text-[10px] font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
+                SELECCIONA_HAZARD_PARA_VINCULAR_MEDIDAS:
+              </label>
+              <span className={`text-[9px] font-mono uppercase ${themeClasses.text.tertiary}`}>
+                {inScopeHazards.length} IN_SCOPE
+              </span>
+            </div>
+            {inScopeHazards.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {inScopeHazards.map(hazard => {
+                  const isSelected = selectedHazardId === hazard.id;
+                  const hasMeasures = (selectedMeasures[hazard.id] || []).length > 0;
+                  const assessment = assessments.find(a => a.hazardTypeId === hazard.id);
+                  
+                  return (
+                    <button
+                      key={hazard.id}
+                      type="button"
+                      onClick={() => onSelectHazard(hazard.id)}
+                      className={`px-3 py-2 rounded-lg text-xs font-mono uppercase tracking-wider transition-all border-2 flex items-center space-x-2 ${
+                        isSelected
+                          ? theme === 'dark'
+                            ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88] shadow-sm shadow-[#00ff88]/20'
+                            : 'bg-green-100 text-green-700 border-green-500 shadow-sm'
+                          : `${themeClasses.bg.tertiary} ${themeClasses.text.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30`
+                      }`}
+                      title={assessment ? `Risk Band: ${assessment.riskBand}` : undefined}
+                    >
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        isSelected ? 'bg-[#00ff88]' : 'bg-[#666666]'
+                      }`}></div>
+                      <span className="truncate">{hazard.name.replace(/\s/g, '_')}</span>
+                      {hasMeasures && (
+                        <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          theme === 'dark'
+                            ? 'bg-[#00a8ff]/20 text-[#00a8ff]'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {selectedMeasures[hazard.id].length}M
+                        </span>
+                      )}
+                      {assessment && (
+                        <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          assessment.riskBand === 'Very High' || assessment.riskBand === 'High'
+                            ? theme === 'dark'
+                              ? 'bg-red-500/20 text-red-400'
+                              : 'bg-red-100 text-red-700'
+                            : assessment.riskBand === 'Moderate'
+                              ? theme === 'dark'
+                                ? 'bg-[#ffb800]/20 text-[#ffb800]'
+                                : 'bg-amber-100 text-amber-700'
+                              : theme === 'dark'
+                                ? 'bg-[#00ff88]/20 text-[#00ff88]'
+                                : 'bg-green-100 text-green-700'
+                        }`}>
+                          {assessment.riskBand.charAt(0)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-6">
+                <div className="text-center">
+                  <AlertTriangle size={48} className={`mx-auto mb-4 ${themeClasses.text.tertiary}`} />
+                  <p className={`text-sm font-bold font-mono uppercase tracking-wider mb-2 ${themeClasses.text.tertiary}`}>
+                    NO_HAY_HAZARDS_IN_SCOPE
+                  </p>
+                  <p className={`text-xs font-mono uppercase ${themeClasses.text.tertiary}`}>
+                    EVALUA_HAZARDS_EN_MATERIALITY_ASSESSMENT_PRIMERO
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1799,14 +2335,86 @@ const AdaptationDetailsContent: React.FC<{
     <div className={`border rounded-xl overflow-hidden flex flex-col transition-colors ${themeClasses.card.bg} ${themeClasses.card.border}`} style={{ maxHeight: 'calc(100vh - 400px)' }}>
       <div className={`p-4 border-b flex-shrink-0 transition-colors ${themeClasses.border.default}`}>
         <div className="flex items-center justify-between mb-2">
-          <div>
+          <div className="flex-1">
             <h4 className={`text-sm font-bold font-mono uppercase tracking-wider transition-colors ${themeClasses.text.primary}`}>
               ADAPTATION_DETAILS
             </h4>
-            <p className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary}`}>
-              {selectedHazard.name.replace(/\s/g, '_')}
+            <p className={`text-[10px] font-mono transition-colors ${themeClasses.text.tertiary} mb-2`}>
+              SELECCIONA_HAZARD_PARA_VINCULAR_MEDIDAS
             </p>
           </div>
+        </div>
+        
+        {/* Hazard Selector */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-2">
+            <label className={`text-[10px] font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
+              SELECCIONA_HAZARD_PARA_VINCULAR_MEDIDAS:
+            </label>
+            <span className={`text-[9px] font-mono uppercase ${themeClasses.text.tertiary}`}>
+              {inScopeHazards.length} IN_SCOPE
+            </span>
+          </div>
+          {inScopeHazards.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {inScopeHazards.map(hazard => {
+                const isSelected = selectedHazardId === hazard.id;
+                const hasMeasures = (selectedMeasures[hazard.id] || []).length > 0;
+                const assessment = assessments.find(a => a.hazardTypeId === hazard.id);
+                
+                return (
+                  <button
+                    key={hazard.id}
+                    type="button"
+                    onClick={() => onSelectHazard(hazard.id)}
+                    className={`px-3 py-2 rounded-lg text-xs font-mono uppercase tracking-wider transition-all border-2 flex items-center space-x-2 ${
+                      isSelected
+                        ? theme === 'dark'
+                          ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88] shadow-sm shadow-[#00ff88]/20'
+                          : 'bg-green-100 text-green-700 border-green-500 shadow-sm'
+                        : `${themeClasses.bg.tertiary} ${themeClasses.text.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30`
+                    }`}
+                    title={assessment ? `Risk Band: ${assessment.riskBand}` : undefined}
+                  >
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      isSelected ? 'bg-[#00ff88]' : 'bg-[#666666]'
+                    }`}></div>
+                    <span className="truncate">{hazard.name.replace(/\s/g, '_')}</span>
+                    {hasMeasures && (
+                      <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        theme === 'dark'
+                          ? 'bg-[#00a8ff]/20 text-[#00a8ff]'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {selectedMeasures[hazard.id].length}M
+                      </span>
+                    )}
+                    {assessment && (
+                      <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        assessment.riskBand === 'Very High' || assessment.riskBand === 'High'
+                          ? theme === 'dark'
+                            ? 'bg-red-500/20 text-red-400'
+                            : 'bg-red-100 text-red-700'
+                          : assessment.riskBand === 'Moderate'
+                            ? theme === 'dark'
+                              ? 'bg-[#ffb800]/20 text-[#ffb800]'
+                              : 'bg-amber-100 text-amber-700'
+                            : theme === 'dark'
+                              ? 'bg-[#00ff88]/20 text-[#00ff88]'
+                              : 'bg-green-100 text-green-700'
+                      }`}>
+                        {assessment.riskBand.charAt(0)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className={`text-xs font-mono uppercase tracking-wider ${themeClasses.text.tertiary} mt-2`}>
+              NO_HAY_HAZARDS_IN_SCOPE_DISPONIBLES
+            </p>
+          )}
         </div>
       </div>
       
@@ -1814,7 +2422,7 @@ const AdaptationDetailsContent: React.FC<{
         {/* Primary DNSH Status from Checklist (Source of Truth) */}
         {(() => {
           // Recalculate status whenever asset.dnshEvaluation changes
-          const checklistStatus = getAssetObjectiveStatus(asset, DnshObjective.ADAPTATION);
+          const checklistStatus = getAssetObjectiveStatus(asset, DnshObjective.ADAPTATION, operation.substantialContributionId);
           const hasChecklistAnswers = asset.dnshEvaluation?.checklistAnswers?.[DnshObjective.ADAPTATION] && 
             Object.keys(asset.dnshEvaluation.checklistAnswers[DnshObjective.ADAPTATION]).length > 0;
           

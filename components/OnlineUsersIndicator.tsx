@@ -24,11 +24,17 @@ export const OnlineUsersIndicator: React.FC<OnlineUsersIndicatorProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Filter users based on context
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersIndicator.tsx:27',message:'Filtering users',data:{onlineUsersCount:onlineUsers.length,onlineUsersType:typeof onlineUsers,assetId:assetId ? String(assetId) : undefined,operationId:operationId ? String(operationId) : undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
+  
   let relevantUsers = onlineUsers;
   if (assetId) {
-    relevantUsers = usersInAsset(assetId);
+    relevantUsers = usersInAsset(String(assetId));
   } else if (operationId) {
-    relevantUsers = usersInOperation(operationId);
+    relevantUsers = usersInOperation(String(operationId));
   }
 
   const visibleUsers = relevantUsers.slice(0, maxVisible);
@@ -109,7 +115,18 @@ export const OnlineUsersIndicator: React.FC<OnlineUsersIndicatorProps> = ({
 
         {/* Count Text - Matching the design */}
         <span className={`text-xs font-mono uppercase tracking-wider font-semibold ${themeClasses.text.primary}`}>
-          {relevantUsers.length} ONLINE
+          {(() => {
+            // #region agent log
+            try {
+              const count = relevantUsers.length;
+              fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersIndicator.tsx:110',message:'Rendering user count',data:{countType:typeof count,countValue:count,relevantUsersType:typeof relevantUsers},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              return `${Number(count)} ONLINE`;
+            } catch (e) {
+              fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersIndicator.tsx:110',message:'Error rendering count',data:{error:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              return '0 ONLINE';
+            }
+            // #endregion
+          })()}
         </span>
 
         {/* Expand Icon */}
@@ -128,7 +145,7 @@ export const OnlineUsersIndicator: React.FC<OnlineUsersIndicatorProps> = ({
         >
           <div className={`p-3 border-b ${themeClasses.border}`}>
             <h3 className={`text-sm font-bold font-mono uppercase tracking-wider ${themeClasses.text.primary}`}>
-              USUARIOS ONLINE ({relevantUsers.length})
+              USUARIOS ONLINE ({Number(relevantUsers.length)})
             </h3>
           </div>
           <div className="max-h-80 overflow-y-auto p-2">

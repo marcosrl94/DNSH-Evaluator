@@ -19,7 +19,27 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
   showLabels = true,
   compact = false,
 }) => {
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyProgress.tsx:17',message:'JourneyProgressIndicator render',data:{progressType:typeof progress,progressStageType:typeof progress?.stage,progressProgressType:typeof progress?.progress,progressLastUpdatedType:typeof progress?.lastUpdated,progressKeys:progress?Object.keys(progress):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
+  
   const { theme } = useTheme();
+  
+  // Ensure progress is valid and all properties are primitives
+  if (!progress || typeof progress !== 'object') {
+    return null;
+  }
+  
+  const safeProgress = {
+    operationId: String(progress.operationId || ''),
+    stage: progress.stage,
+    completed: Boolean(progress.completed),
+    progress: Number(progress.progress || 0),
+    lastUpdated: String(progress.lastUpdated || ''),
+    updatedBy: String(progress.updatedBy || 'system')
+  };
   
   const getStageIcon = (stage: JourneyStage) => {
     const stageMeta = JOURNEY_STAGES.find(s => s.stage === stage);
@@ -40,7 +60,13 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
   };
 
   const getStageStatus = (stage: JourneyStage) => {
-    const currentIndex = JOURNEY_STAGES.findIndex(s => s.stage === progress.stage);
+    // #region agent log
+    try {
+      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyProgress.tsx:42',message:'getStageStatus called',data:{progressStageType:typeof safeProgress.stage,progressStageValue:String(safeProgress.stage),stageType:typeof stage,stageValue:String(stage)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    } catch (e) {}
+    // #endregion
+    
+    const currentIndex = JOURNEY_STAGES.findIndex(s => s.stage === safeProgress.stage);
     const stageIndex = JOURNEY_STAGES.findIndex(s => s.stage === stage);
     
     if (stageIndex < currentIndex) return 'completed';
@@ -74,10 +100,10 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
           const isLast = index === JOURNEY_STAGES.length - 1;
           
           return (
-            <React.Fragment key={stageMeta.stage}>
+            <React.Fragment key={String(stageMeta.stage)}>
               <div
                 className={`flex items-center justify-center w-6 h-6 rounded-full border-2 ${themeClasses[status].border} ${themeClasses[status].bg} transition-all`}
-                title={stageMeta.label}
+                title={String(stageMeta.label || '')}
               >
                 {status === 'completed' ? (
                   <CheckCircle2 size={12} className={themeClasses[status].icon} />
@@ -99,45 +125,91 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
     <div className={`p-4 rounded-lg border ${theme === 'dark' ? 'border-[#1a1a1a] bg-[#111111]' : 'border-gray-200 bg-white'}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className={`text-sm font-bold font-mono uppercase tracking-wider ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-          PROGRESO DEL JOURNEY
+          PROGRESO_JOURNEY
         </h3>
-        <span className={`text-xs font-mono ${theme === 'dark' ? 'text-[#666666]' : 'text-gray-500'}`}>
-          {Number(progress.progress || 0)}%
+        <span className={`text-xs font-bold font-mono ${theme === 'dark' ? 'text-[#00ff88]' : 'text-green-600'}`}>
+          {(() => {
+            // #region agent log
+            try {
+              const prog = safeProgress.progress;
+              fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyProgress.tsx:105',message:'Rendering progress percentage',data:{progressType:typeof prog,progressValue:String(prog)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              return `${Number(prog || 0)}%`;
+            } catch (e) {
+              fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyProgress.tsx:105',message:'Error converting progress',data:{conversionError:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              return '0%';
+            }
+            // #endregion
+          })()}
         </span>
       </div>
       
       <div className="space-y-2">
-        {JOURNEY_STAGES.map((stageMeta, index) => {
-          const status = getStageStatus(stageMeta.stage);
-          const isCurrent = status === 'current';
-          
-          return (
-            <div
-              key={stageMeta.stage}
-              className={`flex items-center space-x-3 p-2 rounded-lg transition-all ${
-                isCurrent ? themeClasses.current.bg : ''
-              }`}
-            >
-              <div className={`flex-shrink-0 ${themeClasses[status].icon}`}>
-                {status === 'completed' ? (
-                  <CheckCircle2 size={18} />
-                ) : (
-                  getStageIcon(stageMeta.stage)
-                )}
-              </div>
-              <div className="flex-1">
-                <div className={`text-xs font-mono uppercase tracking-wider ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  {index + 1}. {String(stageMeta.label || '')}
+        {(() => {
+          // Unified stages for display - combine AUTOMATED_EVALUATION and MANUAL_DATA_ENTRY into EVAL_DNSH
+          const unifiedStages = [
+            JOURNEY_STAGES.find(s => s.stage === JourneyStage.INPUT_LOADING)!,
+            {
+              stage: JourneyStage.AUTOMATED_EVALUATION, // Use AUTOMATED_EVALUATION as representative
+              label: 'EVAL_DNSH',
+              description: 'Evaluación DNSH automatizada y datos manuales',
+              icon: 'Zap',
+              order: 2
+            },
+            JOURNEY_STAGES.find(s => s.stage === JourneyStage.REPORT_GENERATION)!,
+            JOURNEY_STAGES.find(s => s.stage === JourneyStage.REVIEW_MANAGEMENT)!
+          ].filter(Boolean);
+
+          return unifiedStages.map((stageMeta, index) => {
+            // Determine status: if current stage is AUTOMATED_EVALUATION or MANUAL_DATA_ENTRY, show as current
+            const isEvalStage = safeProgress.stage === JourneyStage.AUTOMATED_EVALUATION || 
+                              safeProgress.stage === JourneyStage.MANUAL_DATA_ENTRY;
+            const isCurrentEval = stageMeta.stage === JourneyStage.AUTOMATED_EVALUATION && isEvalStage;
+            
+            const currentIndex = unifiedStages.findIndex(s => 
+              s.stage === safeProgress.stage || 
+              (safeProgress.stage === JourneyStage.MANUAL_DATA_ENTRY && s.stage === JourneyStage.AUTOMATED_EVALUATION)
+            );
+            const stageIndex = unifiedStages.findIndex(s => s.stage === stageMeta.stage);
+            
+            let status: 'completed' | 'current' | 'pending';
+            if (stageIndex < currentIndex) {
+              status = 'completed';
+            } else if (stageIndex === currentIndex || isCurrentEval) {
+              status = 'current';
+            } else {
+              status = 'pending';
+            }
+            
+            const isCurrent = status === 'current';
+            
+            return (
+              <div
+                key={String(stageMeta.stage)}
+                className={`flex items-center space-x-3 p-2 rounded-lg transition-all ${
+                  isCurrent ? themeClasses.current.bg : ''
+                }`}
+              >
+                <div className={`flex-shrink-0 ${themeClasses[status].icon}`}>
+                  {status === 'completed' ? (
+                    <CheckCircle2 size={18} />
+                  ) : (
+                    getStageIcon(stageMeta.stage)
+                  )}
                 </div>
-                {showLabels && (
-                  <div className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-[#666666]' : 'text-gray-500'}`}>
-                    {String(stageMeta.description || '')}
+                <div className="flex-1">
+                  <div className={`text-xs font-mono uppercase tracking-wider ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {String(stageMeta.label || '')}
                   </div>
-                )}
+                  {showLabels && (
+                    <div className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-[#666666]' : 'text-gray-500'}`}>
+                      {String(stageMeta.description || '')}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          });
+        })()}
       </div>
     </div>
   );

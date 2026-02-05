@@ -107,6 +107,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
           
           // If user is logged in with Google but doesn't have avatarUrl, try to get it from token
+          const authProvider = getAuthProvider();
           if (storedUser && !storedUser.avatarUrl && authProvider === 'google') {
             const googleToken = localStorage.getItem('ecoinvest_google_token');
             if (googleToken) {

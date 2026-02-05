@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Droplets, RefreshCw, Leaf, Zap, FileText, MapPin, Sparkles, Info, Shield, MapPin as MapPinIcon } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Droplets, RefreshCw, Leaf, Zap, FileText, MapPin, Sparkles, Info, Shield, MapPin as MapPinIcon, X } from 'lucide-react';
 import { Operation, DnshObjective, EvidenceDocument, Asset } from '../types';
 import { DNSH_CHECKLIST_TEMPLATES } from '../constants';
 import DnshAdaptationPage from './DnshAdaptation';
@@ -9,6 +9,7 @@ import { findNearbyKBAs } from '../constants/kbas';
 import { findNearbyWaterRiskZones } from '../constants/waterRisk';
 import { getObjectiveStatusFromAsset, calculateObjectiveStats, isAssetExemptForObjective } from '../utils/dnshCalculations';
 import { validateDnshStatus, canDisplayDnshStatus } from '../services/dnshValidation';
+import { identifyMissingData } from '../services/missingDataService';
 
 interface Props {
   operation: Operation;
@@ -23,6 +24,7 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
   const [activeTab, setActiveTab] = useState<'evaluation' | 'evidence' | 'map'>('evaluation');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [waterRiskZones, setWaterRiskZones] = useState<any[]>([]);
+  const [showMissingDataSummary, setShowMissingDataSummary] = useState(true);
   
   // Load WRI data when Water objective is active and asset is selected
   const safeAssets = Array.isArray(operation.assets) ? operation.assets : [];
@@ -417,8 +419,63 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
     }
 
     // For other objectives, show checklist with objective-specific enhancements
+    const missingData = identifyMissingData(operation, activeObjective);
+    const hasMissingData = missingData.critical + missingData.important > 0;
+    
     return (
       <div className="h-full flex flex-col space-y-4">
+        {/* Missing Data Summary Banner - Show at top if there are missing items */}
+        {hasMissingData && showMissingDataSummary && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-r-lg p-4 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
+                  <h3 className="font-semibold text-slate-900">Datos Pendientes de Completar</h3>
+                </div>
+                <p className="text-sm text-slate-700 mb-3">
+                  Hay <strong>{missingData.critical + missingData.important}</strong> dato(s) pendiente(s) para completar la evaluación de este objetivo.
+                  {missingData.critical > 0 && (
+                    <span className="text-red-600 font-semibold"> {missingData.critical} crítico(s)</span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {missingData.items
+                    .filter(item => item.category === 'critical' || item.category === 'important')
+                    .slice(0, 3)
+                    .map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          if (item.assetId) setSelectedAssetId(item.assetId);
+                          setShowMissingDataSummary(false);
+                          // Scroll to question would happen naturally when asset is selected
+                        }}
+                        className="text-xs px-3 py-1 bg-white border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors text-left"
+                      >
+                        <span className="font-medium">{item.assetName || 'General'}</span>
+                        {item.objective && (
+                          <span className="text-slate-500"> • {item.objective.split(' ')[0]}</span>
+                        )}
+                      </button>
+                    ))}
+                  {missingData.items.filter(item => item.category === 'critical' || item.category === 'important').length > 3 && (
+                    <span className="text-xs text-slate-500 self-center">
+                      +{missingData.items.filter(item => item.category === 'critical' || item.category === 'important').length - 3} más
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMissingDataSummary(false)}
+                className="ml-4 text-slate-400 hover:text-slate-600 flex-shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Objective Header */}
         <div className={`${colorClasses.bg} border-l-4 ${colorClasses.border} p-4 rounded-r-lg bg-[#0a0a0a] border-[#1a1a1a]`}>
           <div className="flex items-start justify-between">
@@ -618,6 +675,17 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
           }
 
           // Show normal questionnaire
+          // Get missing data for selected asset or all assets
+          const assetMissingData = selectedAssetId
+            ? missingData.items.filter(item => item.assetId === selectedAssetId)
+            : missingData.items.filter(item => item.objective === activeObjective);
+          
+          const missingQuestionIds = new Set(
+            assetMissingData
+              .filter(item => item.type === 'checklist' && item.questionId)
+              .map(item => item.questionId!)
+          );
+
           return (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-y-auto p-6 min-h-0">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">Criterios de Evaluación DNSH</h3>
@@ -633,8 +701,26 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
                       })()
                     : null;
 
+                  const isMissing = missingQuestionIds.has(q.id);
+                  const missingItem = assetMissingData.find(item => item.questionId === q.id);
+
                   return (
-                    <div key={q.id} className="p-4 rounded-lg border border-slate-100 bg-slate-50/50">
+                    <div 
+                      key={q.id} 
+                      className={`p-4 rounded-lg border transition-all ${
+                        isMissing 
+                          ? 'border-amber-300 bg-amber-50/50 shadow-sm' 
+                          : 'border-slate-100 bg-slate-50/50'
+                      }`}
+                    >
+                      {isMissing && (
+                        <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-amber-200">
+                          <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
+                          <span className="text-xs font-medium text-amber-700">
+                            Pendiente: {missingItem?.description || 'Falta completar esta pregunta'}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-start space-x-3 mb-3">
                         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs">
                           {idx + 1}
@@ -768,7 +854,7 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
             <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center space-x-2 flex-shrink-0">
             <button
               onClick={() => setActiveTab('evaluation')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center relative ${
                 activeTab === 'evaluation'
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:shadow-sm'
@@ -776,6 +862,15 @@ const DnshEvaluationPage: React.FC<Props> = ({ operation, onBack, onUpdateOperat
             >
               <CheckCircle size={16} className="mr-2 flex-shrink-0" />
               <span className="whitespace-nowrap">Evaluación</span>
+              {(() => {
+                const missing = identifyMissingData(operation, activeObjective);
+                const criticalCount = missing.critical + missing.important;
+                return criticalCount > 0 && activeTab === 'evaluation' ? (
+                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs font-semibold flex-shrink-0">
+                    {criticalCount} pendiente{criticalCount !== 1 ? 's' : ''}
+                  </span>
+                ) : null;
+              })()}
             </button>
             <button
               onClick={() => setActiveTab('evidence')}

@@ -4,7 +4,7 @@
  * Extracted from App.tsx for better code organization
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { LayoutDashboard, Globe, ShieldCheck, FileText, Menu, X, Settings, BookOpen, LogOut, Briefcase, UserCircle, Upload, Archive, Zap, Edit, CheckCircle2 } from 'lucide-react';
 import { User } from '../types';
 import { JourneyStage, JOURNEY_STAGES } from '../types/journey';
@@ -18,36 +18,62 @@ interface SidebarItemProps {
   theme: 'light' | 'dark';
 }
 
-const SidebarItem = React.memo<SidebarItemProps>(({ icon, label, isOpen, isActive, onClick, theme }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-all group font-mono border-l-4 ${
-      theme === 'dark'
-        ? isActive 
-          ? 'bg-[#1e293b] text-white shadow-md border-[#00ff88]' 
-          : 'text-[#666666] hover:bg-[#1e293b] hover:text-white border-transparent'
-        : isActive
-          ? 'bg-gray-100 text-gray-900 shadow-md border-[#0066cc]'
-          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-transparent'
-    }`}
-  >
-    <span className={`flex-shrink-0 transition-colors ${
-      isActive 
-        ? theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'
-        : theme === 'dark' ? 'group-hover:text-white' : 'group-hover:text-gray-900'
-    }`}>{icon}</span>
-    {isOpen && <span className="font-medium text-xs tracking-widest uppercase">{label}</span>}
-  </button>
-));
+const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isOpen, isActive, onClick, theme }) => {
+  const handleClick = React.useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('SidebarItem clicked:', label, 'onClick function:', typeof onClick);
+    if (typeof onClick === 'function') {
+      onClick();
+    } else {
+      console.error('onClick is not a function:', onClick);
+    }
+  }, [onClick, label]);
+
+  return (
+    <button 
+      type="button"
+      onClick={handleClick}
+      className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-all group font-mono border-l-4 cursor-pointer select-none ${
+        theme === 'dark'
+          ? isActive 
+            ? 'bg-[#1e293b] text-white shadow-md border-[#00ff88]' 
+            : 'text-[#666666] hover:bg-[#1e293b] hover:text-white border-transparent'
+          : isActive
+            ? 'bg-gray-100 text-gray-900 shadow-md border-[#0066cc]'
+            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-transparent'
+      }`}
+      style={{ 
+        pointerEvents: 'auto', 
+        zIndex: 100, 
+        position: 'relative',
+        cursor: 'pointer'
+      }}
+      tabIndex={0}
+      aria-label={label}
+    >
+      <span className={`flex-shrink-0 transition-colors pointer-events-none ${
+        isActive 
+          ? theme === 'dark' ? 'text-[#00ff88]' : 'text-[#0066cc]'
+          : theme === 'dark' ? 'group-hover:text-white' : 'group-hover:text-gray-900'
+      }`}>{icon}</span>
+      {isOpen && <span className="font-medium text-xs tracking-widest uppercase pointer-events-none">{label}</span>}
+    </button>
+  );
+};
+
+type ViewType = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail' | 'dnsh-evaluation' | 'map-viewer' | 'catalogs' | 'reports' | 'deal-management' | 'historical-operations';
 
 interface AppSidebarProps {
   isOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
-  currentView: string;
-  setCurrentView: (view: string) => void;
+  currentView: ViewType;
+  setCurrentView: (view: ViewType) => void;
   setSelectedOperationId: (id: string | null) => void;
   setSelectedClientId: (id: string | null) => void;
   setSelectedAssetId: (id: string | null) => void;
+  selectedOperationId: string | null; // Add this prop
+  selectedAssetId: string | null; // Add this prop
   theme: 'light' | 'dark';
   user: User | null;
   logout: () => void;
@@ -61,24 +87,28 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   setSelectedOperationId,
   setSelectedClientId,
   setSelectedAssetId,
+  selectedOperationId, // Add this prop
+  selectedAssetId, // Add this prop
   theme,
   user,
   logout,
 }) => {
-  const handleNavigation = (view: string) => {
+  const handleNavigation = React.useCallback((view: ViewType) => {
+    console.log('handleNavigation called with view:', view);
     setSelectedOperationId(null);
     setSelectedClientId(null);
     setSelectedAssetId(null);
     setCurrentView(view);
-  };
+  }, [setSelectedOperationId, setSelectedClientId, setSelectedAssetId, setCurrentView]);
 
   return (
     <aside 
-      className={`${isOpen ? 'w-72' : 'w-20'} flex-shrink-0 border-r transition-all duration-300 flex flex-col z-20 ${
+      className={`${isOpen ? 'w-72' : 'w-20'} flex-shrink-0 border-r transition-all duration-300 flex flex-col ${
         theme === 'dark' 
           ? 'bg-black border-[#1a1a1a] text-[#a0a0a0]' 
           : 'bg-white border-gray-200 text-gray-600'
       }`}
+      style={{ pointerEvents: 'auto', zIndex: 50, position: 'relative' }}
     >
       {/* Logo Area */}
       <div className={`h-20 flex items-center px-6 border-b transition-colors ${
@@ -107,7 +137,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       </div>
 
       {/* Navigation - User Journey Based */}
-      <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto" style={{ pointerEvents: 'auto', position: 'relative', zIndex: 2 }}>
         {/* Dashboard */}
         <SidebarItem 
           icon={<LayoutDashboard size={20} />} 
@@ -130,42 +160,32 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         {/* Stage 1: Input Loading */}
         <SidebarItem 
           icon={<Upload size={20} />} 
-          label="1. CARGA_INPUTS" 
+          label="CARGA_INPUTS" 
           isOpen={isOpen} 
-          isActive={currentView === 'deal-management' || currentView === 'operation-list'}
+          isActive={currentView === 'deal-management'}
           theme={theme}
-          onClick={() => { setSelectedOperationId(null); setCurrentView('operation-list'); }} 
+          onClick={() => { 
+            setSelectedOperationId(null); 
+            setSelectedClientId(null);
+            setSelectedAssetId(null);
+            setCurrentView('deal-management'); 
+          }} 
         />
 
-        {/* Stage 2: Automated Evaluation */}
+        {/* Stage 2-3: Unified Evaluation (Automated + Manual) */}
         <SidebarItem 
           icon={<Zap size={20} />} 
-          label="2. EVAL_AUTOMATIZADA" 
+          label={selectedAssetId ? "EVAL_DNSH (ASSET)" : "EVAL_DNSH (PORTFOLIO)"}
           isOpen={isOpen} 
           isActive={currentView === 'dnsh-evaluation'}
           theme={theme}
           onClick={() => {
             // Navigate to evaluation if operation is selected
-            if (currentView === 'operation-detail') {
+            if (selectedOperationId) {
+              // Keep current asset selection if exists, otherwise start at Portfolio view
               setCurrentView('dnsh-evaluation');
             } else {
-              handleNavigation('operation-list');
-            }
-          }} 
-        />
-
-        {/* Stage 3: Manual Data Entry */}
-        <SidebarItem 
-          icon={<Edit size={20} />} 
-          label="3. DATOS_MANUALES" 
-          isOpen={isOpen} 
-          isActive={currentView === 'dnsh-evaluation' && selectedAssetId !== null}
-          theme={theme}
-          onClick={() => {
-            // Navigate to asset evaluation for manual entry
-            if (currentView === 'dnsh-evaluation') {
-              // Already in evaluation, could show manual entry panel
-            } else {
+              // No operation selected, go to operation list to select one
               handleNavigation('operation-list');
             }
           }} 
@@ -174,17 +194,22 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         {/* Stage 4: Report Generation */}
         <SidebarItem 
           icon={<FileText size={20} />} 
-          label="4. EXPEDIENTES_REPORTES" 
+          label="EXPEDIENTES_REPORTES" 
           isOpen={isOpen} 
           isActive={currentView === 'reports'}
           theme={theme}
-          onClick={() => setCurrentView('reports')} 
+          onClick={() => {
+            setSelectedOperationId(null);
+            setSelectedClientId(null);
+            setSelectedAssetId(null);
+            setCurrentView('reports');
+          }} 
         />
 
         {/* Stage 5: Review & Management */}
         <SidebarItem 
           icon={<Archive size={20} />} 
-          label="5. REVISION_HISTORICOS" 
+          label="REVISION_HISTORICOS" 
           isOpen={isOpen} 
           isActive={currentView === 'historical-operations'}
           theme={theme}
@@ -206,7 +231,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           isOpen={isOpen} 
           isActive={currentView === 'catalogs'}
           theme={theme}
-          onClick={() => setCurrentView('catalogs')} 
+          onClick={() => {
+            setSelectedOperationId(null);
+            setSelectedClientId(null);
+            setSelectedAssetId(null);
+            setCurrentView('catalogs');
+          }} 
         />
         <SidebarItem 
           icon={<Globe size={20} />} 
@@ -214,7 +244,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           isOpen={isOpen} 
           isActive={currentView === 'map-viewer'}
           theme={theme}
-          onClick={() => setCurrentView('map-viewer')} 
+          onClick={() => {
+            setSelectedOperationId(null);
+            setSelectedClientId(null);
+            setSelectedAssetId(null);
+            setCurrentView('map-viewer');
+          }} 
         />
         <SidebarItem 
           icon={<Settings size={20} />} 

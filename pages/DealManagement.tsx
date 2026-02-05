@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { Upload, FileText, Plus, X, CheckCircle, AlertCircle, Building2, MapPin, Briefcase, Download, FileSpreadsheet, Trash2, Edit, List, Search, Filter, Archive, ArchiveRestore, CheckSquare, Square } from 'lucide-react';
-import { Operation, Asset, EUAssetType, Client, DnshObjective, EvidenceType } from '../types';
+import { Operation, Asset, EUAssetType, Client, DnshObjective, EvidenceType, EvidenceDocument } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 import { getAllClients, createClient, createOperation, getAllOperations, getActiveOperations, updateOperation, deleteOperation, archiveOperation, dataStore } from '../services/dataManagement';
 import { logger } from '../utils/logger';
 import { generateGeographicAttributes } from '../utils/geoCalculations';
+import { processDocument, createEvidenceFromProcessed, ProcessedDocumentData } from '../services/documentProcessor';
 
 interface DealFormData {
   // Cliente/Compañía
@@ -22,7 +23,7 @@ interface DealFormData {
   capex: number;
   dealPrice?: number;
   expectedReturn?: number;
-  substantialContributionId: DnshObjective;
+  substantialContributionId: DnshObjective | 'N/A';
   
   // Assets
   assets: AssetFormData[];
@@ -71,6 +72,9 @@ const DealManagement: React.FC = () => {
   const [selectedDeals, setSelectedDeals] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<'archive' | 'delete' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const evidenceFileInputRef = useRef<HTMLInputElement>(null);
+  const [processingDocuments, setProcessingDocuments] = useState<Set<number>>(new Set());
+  const [processedData, setProcessedData] = useState<Record<number, ProcessedDocumentData>>({});
   
   const [formData, setFormData] = useState<DealFormData>({
     clientId: '',
@@ -204,6 +208,44 @@ const DealManagement: React.FC = () => {
     }));
   };
 
+  const handleEvidenceFileUpload = async (index: number, file: File) => {
+    if (!file) return;
+
+    // Update evidence with file
+    handleEvidenceChange(index, 'file', file);
+    handleEvidenceChange(index, 'name', file.name);
+
+    // Process document automatically
+    setProcessingDocuments(prev => new Set(prev).add(index));
+    
+    try {
+      const processed = await processDocument(file, {
+        operationName: formData.dealName,
+        assets: formData.assets.map(a => ({ id: '', name: a.name })),
+        sectorNACE: formData.sectorNACE
+      });
+
+      // Store processed data
+      setProcessedData(prev => ({ ...prev, [index]: processed }));
+
+      // Auto-fill evidence fields from processed data
+      if (processed.documentType) {
+        handleEvidenceChange(index, 'type', processed.documentType);
+      }
+      if (processed.description) {
+        handleEvidenceChange(index, 'description', processed.description);
+      }
+    } catch (error) {
+      logger.error('Error processing document:', error);
+    } finally {
+      setProcessingDocuments(prev => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
+    }
+  };
+
   const validateForm = (): string | null => {
     if (!formData.dealName.trim()) {
       return 'El nombre del deal es requerido';
@@ -313,7 +355,46 @@ const DealManagement: React.FC = () => {
         })
       );
       
-      // 3. Crear operación usando la función centralizada
+      // 3. Procesar documentos de evidencia
+      const evidenceDocuments: Omit<EvidenceDocument, 'id' | 'uploadDate'>[] = await Promise.all(
+        formData.evidenceDocuments.map(async (evidenceForm) => {
+          if (evidenceForm.file) {
+            // Si ya tenemos datos procesados, usarlos; si no, procesar ahora
+            const processed = processedData[formData.evidenceDocuments.indexOf(evidenceForm)] || 
+              await processDocument(evidenceForm.file, {
+                operationName: formData.dealName,
+                assets: createdAssets.map(a => ({ id: a.id, name: a.name })),
+                sectorNACE: formData.sectorNACE
+              });
+            
+            // Crear EvidenceDocument desde datos procesados
+            return createEvidenceFromProcessed(
+              processed,
+              '', // operationId se asignará después de crear la operación
+              undefined, // assetId
+              'Current User', // uploadedBy
+              URL.createObjectURL(evidenceForm.file) // fileUrl temporal
+            );
+          } else {
+            // Si no hay archivo, crear documento básico desde el formulario
+            return {
+              operationId: '',
+              name: evidenceForm.name,
+              type: evidenceForm.type,
+              description: evidenceForm.description,
+              uploadedBy: 'Current User',
+              fileUrl: undefined,
+              documentDate: undefined,
+              author: undefined,
+              language: undefined,
+              relatedObjective: undefined,
+              tags: undefined
+            };
+          }
+        })
+      );
+
+      // 4. Crear operación usando la función centralizada
       const operationData: Partial<Operation> = {
         clientId,
         name: formData.dealName,
@@ -322,10 +403,14 @@ const DealManagement: React.FC = () => {
         capex: formData.capex,
         dealPrice: formData.dealPrice,
         expectedReturn: formData.expectedReturn,
-        substantialContributionId: formData.substantialContributionId,
+        substantialContributionId: formData.substantialContributionId === 'N/A' ? DnshObjective.MITIGATION : formData.substantialContributionId,
         status: 'Draft',
         assets: createdAssets,
-        evidenceDocuments: []
+        evidenceDocuments: evidenceDocuments.map((ev, idx) => ({
+          ...ev,
+          id: `ev-${Date.now()}-${idx}`,
+          uploadDate: new Date().toISOString()
+        }))
       };
       
       await createOperation(operationData);
@@ -345,7 +430,7 @@ const DealManagement: React.FC = () => {
         capex: 0,
         dealPrice: undefined,
         expectedReturn: undefined,
-        substantialContributionId: DnshObjective.MITIGATION,
+        substantialContributionId: 'N/A' as DnshObjective | 'N/A',
         assets: [{ name: '', assetType: EUAssetType.SOLAR_PV, lat: 0, lng: 0, exposedValue: 0 }],
         evidenceDocuments: []
       });
@@ -409,7 +494,9 @@ const DealManagement: React.FC = () => {
               capex: parseFloat(row['capex']) || 0,
               dealPrice: row['deal_price'] ? parseFloat(row['deal_price']) : undefined,
               expectedReturn: row['expected_return'] ? parseFloat(row['expected_return']) : undefined,
-              substantialContributionId: (row['substantial_contribution'] as DnshObjective) || DnshObjective.MITIGATION,
+              substantialContributionId: (row['substantial_contribution'] === 'N/A' || !row['substantial_contribution']) 
+                ? ('N/A' as DnshObjective | 'N/A')
+                : ((row['substantial_contribution'] as DnshObjective) || ('N/A' as DnshObjective | 'N/A')),
               assets: [],
               evidenceDocuments: []
             },
@@ -491,7 +578,7 @@ const DealManagement: React.FC = () => {
             capex: dealData.deal.capex || 0,
             dealPrice: dealData.deal.dealPrice,
             expectedReturn: dealData.deal.expectedReturn,
-            substantialContributionId: dealData.deal.substantialContributionId || DnshObjective.MITIGATION,
+            substantialContributionId: dealData.deal.substantialContributionId || ('N/A' as DnshObjective | 'N/A'),
             status: 'Draft',
             assets: createdAssets,
             evidenceDocuments: []
@@ -998,9 +1085,10 @@ const DealManagement: React.FC = () => {
                 </label>
                 <select
                   value={formData.substantialContributionId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, substantialContributionId: e.target.value as DnshObjective }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, substantialContributionId: e.target.value as DnshObjective | 'N/A' }))}
                   className={`w-full px-4 py-2 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
                 >
+                  <option value="N/A">N/A - No aplica</option>
                   {Object.values(DnshObjective).map(obj => (
                     <option key={obj} value={obj}>{obj}</option>
                   ))}
@@ -1174,6 +1262,213 @@ const DealManagement: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Evidence Documents Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className={`text-lg font-bold font-mono uppercase tracking-wider ${themeClasses.text.primary} flex items-center`}>
+                <FileText size={20} className="mr-2 text-[#00ff88]" />
+                SOPORTES_DOCUMENTALES ({formData.evidenceDocuments.length})
+              </h2>
+              <button
+                type="button"
+                onClick={handleAddEvidence}
+                className={`px-3 py-1.5 bg-[#00ff88] text-[#0a0a0a] rounded-lg font-medium hover:bg-[#00ff88]/80 transition-colors font-mono uppercase tracking-wider text-xs flex items-center`}
+              >
+                <Plus size={14} className="mr-1" />
+                AGREGAR_DOCUMENTO
+              </button>
+            </div>
+            
+            <div className={`p-4 rounded-lg border ${themeClasses.bg.secondary} ${themeClasses.border.default}`}>
+              <p className={`text-sm font-mono ${themeClasses.text.tertiary} mb-4`}>
+                Los documentos cargados serán procesados automáticamente para extraer información relevante para la evaluación DNSH y minimizar el trabajo manual.
+              </p>
+              
+              <div className="space-y-4">
+                {formData.evidenceDocuments.map((evidence, index) => {
+                  const isProcessing = processingDocuments.has(index);
+                  const processed = processedData[index];
+                  
+                  return (
+                    <div key={index} className={`p-4 rounded-lg border ${themeClasses.bg.tertiary} ${themeClasses.border.default}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className={`font-mono uppercase tracking-wider text-sm ${themeClasses.text.primary}`}>
+                          DOCUMENTO {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEvidence(index)}
+                          className={`p-1 text-red-500 hover:bg-red-500/10 rounded transition-colors`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* File Upload */}
+                        <div className="md:col-span-2">
+                          <label className={`block text-xs font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
+                            ARCHIVO (PDF, DOCX, XLSX, imágenes) *
+                          </label>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              ref={index === 0 ? evidenceFileInputRef : undefined}
+                              type="file"
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleEvidenceFileUpload(index, file);
+                                }
+                              }}
+                              className="hidden"
+                              id={`evidence-file-${index}`}
+                            />
+                            <label
+                              htmlFor={`evidence-file-${index}`}
+                              className={`flex-1 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors flex items-center justify-center ${
+                                theme === 'dark'
+                                  ? 'border-[#1a1a1a] hover:border-[#00ff88]/30'
+                                  : 'border-gray-300 hover:border-[#0066cc]/30'
+                              }`}
+                            >
+                              {evidence.file ? (
+                                <span className={`text-sm font-mono ${themeClasses.text.primary}`}>
+                                  {evidence.file.name}
+                                </span>
+                              ) : (
+                                <span className={`text-sm font-mono ${themeClasses.text.tertiary} flex items-center`}>
+                                  <Upload size={16} className="mr-2" />
+                                  SELECCIONAR_ARCHIVO
+                                </span>
+                              )}
+                            </label>
+                            {isProcessing && (
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#00ff88]"></div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Document Type */}
+                        <div>
+                          <label className={`block text-xs font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
+                            TIPO_DOCUMENTO *
+                          </label>
+                          <select
+                            value={evidence.type}
+                            onChange={(e) => handleEvidenceChange(index, 'type', e.target.value as EvidenceType)}
+                            className={`w-full px-3 py-2 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                            required
+                          >
+                            {Object.values(EvidenceType).map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                          {processed?.documentType && (
+                            <p className={`text-xs mt-1 font-mono ${themeClasses.text.tertiary}`}>
+                              Detectado: {processed.documentType}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Document Name */}
+                        <div>
+                          <label className={`block text-xs font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
+                            NOMBRE *
+                          </label>
+                          <input
+                            type="text"
+                            value={evidence.name}
+                            onChange={(e) => handleEvidenceChange(index, 'name', e.target.value)}
+                            className={`w-full px-3 py-2 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                            placeholder="Nombre del documento"
+                            required
+                          />
+                          {processed?.title && (
+                            <p className={`text-xs mt-1 font-mono ${themeClasses.text.tertiary}`}>
+                              Sugerido: {processed.title}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Description */}
+                        <div className="md:col-span-2">
+                          <label className={`block text-xs font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
+                            DESCRIPCIÓN
+                          </label>
+                          <textarea
+                            value={evidence.description || ''}
+                            onChange={(e) => handleEvidenceChange(index, 'description', e.target.value)}
+                            className={`w-full px-3 py-2 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                            rows={2}
+                            placeholder="Descripción del documento..."
+                          />
+                          {processed?.description && (
+                            <p className={`text-xs mt-1 font-mono ${themeClasses.text.tertiary}`}>
+                              Extraído: {processed.description.substring(0, 100)}...
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Processed Information Display */}
+                        {processed && (
+                          <div className="md:col-span-2">
+                            <div className={`p-3 rounded-lg border ${themeClasses.bg.secondary} ${themeClasses.border.default}`}>
+                              <p className={`text-xs font-mono uppercase tracking-wider mb-2 ${themeClasses.text.primary}`}>
+                                INFORMACIÓN_EXTRAÍDA_AUTOMÁTICAMENTE:
+                              </p>
+                              {processed.relatedObjectives && processed.relatedObjectives.length > 0 && (
+                                <div className="mb-2">
+                                  <span className={`text-xs font-mono ${themeClasses.text.secondary}`}>Objetivos DNSH relacionados: </span>
+                                  <span className={`text-xs font-mono ${themeClasses.text.primary}`}>
+                                    {processed.relatedObjectives.join(', ')}
+                                  </span>
+                                </div>
+                              )}
+                              {processed.keyFindings && processed.keyFindings.length > 0 && (
+                                <div className="mb-2">
+                                  <span className={`text-xs font-mono ${themeClasses.text.secondary}`}>Hallazgos clave: </span>
+                                  <span className={`text-xs font-mono ${themeClasses.text.primary}`}>
+                                    {processed.keyFindings.slice(0, 3).join('; ')}
+                                  </span>
+                                </div>
+                              )}
+                              {processed.confidence && (
+                                <div className="text-xs font-mono text-[#00ff88]">
+                                  Confianza: {Math.round(processed.confidence.metadata * 100)}%
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {formData.evidenceDocuments.length === 0 && (
+                  <div className={`p-8 border-2 border-dashed rounded-lg text-center ${themeClasses.border.default}`}>
+                    <FileText size={48} className={`mx-auto mb-4 ${themeClasses.text.tertiary}`} />
+                    <p className={`text-sm font-mono uppercase tracking-wider mb-2 ${themeClasses.text.secondary}`}>
+                      NO_HAY_DOCUMENTOS_CARGADOS
+                    </p>
+                    <p className={`text-xs font-mono ${themeClasses.text.tertiary} mb-4`}>
+                      Agrega documentos de soporte que serán procesados automáticamente para la evaluación DNSH
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleAddEvidence}
+                      className={`px-4 py-2 bg-[#00ff88] text-[#0a0a0a] rounded-lg font-medium hover:bg-[#00ff88]/80 transition-colors font-mono uppercase tracking-wider text-xs`}
+                    >
+                      <Plus size={14} className="inline mr-2" />
+                      AGREGAR_PRIMER_DOCUMENTO
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
