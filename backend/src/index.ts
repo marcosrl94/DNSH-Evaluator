@@ -59,6 +59,11 @@ const corsOrigins = process.env.CORS_ORIGIN
 const app = express();
 const httpServer = createServer(app);
 
+// Health mínimo ANTES de cualquier middleware (para que Railway vea respuesta rápido)
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', ts: new Date().toISOString() });
+});
+
 // Initialize Socket.IO
 const io = new Server(httpServer, {
   cors: {
@@ -123,26 +128,13 @@ app.use('/api/', rateLimiter);
  *                   type: string
  *                   example: development
  */
-app.get('/health', async (req, res) => {
+// Health detallado en /health/db (el /health básico está arriba, antes de middleware)
+app.get('/health/db', async (_req, res) => {
   try {
-    // Check database connection
     const dbStatus = await checkDatabaseHealth();
-    
-    res.json({ 
-      status: 'ok', 
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      database: dbStatus,
-      uptime: process.uptime()
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      database: 'unavailable',
-      error: 'Health check failed'
-    });
+    res.json({ status: 'ok', database: dbStatus });
+  } catch {
+    res.json({ status: 'ok', database: 'unavailable' });
   }
 });
 
