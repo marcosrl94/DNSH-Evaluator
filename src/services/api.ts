@@ -10,30 +10,25 @@ const RAILWAY_API = 'https://dnsh-evaluator-production.up.railway.app/api/v1';
 
 function getApiBaseUrl(): string {
   let base = envApiUrl?.trim() || RAILWAY_API;
-  base = base.replace(/\/$/, ''); // Sin trailing slash
+  base = base.replace(/\/$/, '');
 
-  if (typeof window === 'undefined') {
-    return base;
-  }
-  // En producción en el navegador: SIEMPRE usar Railway, nunca Vercel
-  if (isProd) {
-    const origin = window.location.origin.replace(/\/$/, '');
-    const isVercelOrigin = origin.includes('vercel.app');
-    if (isVercelOrigin) {
-      // Forzar Railway; evita POST a Vercel -> 405
+  if (typeof window !== 'undefined') {
+    const origin = (window.location?.origin || '').replace(/\/$/, '');
+    // CRÍTICO: Si estamos en Vercel, NUNCA usar el origin (POST a Vercel = 405)
+    if (origin.includes('vercel.app')) {
       return RAILWAY_API;
     }
-    if (!base.startsWith('https://')) base = base.replace(/^http:\/\//i, 'https://');
-    if (base === origin || base.startsWith(origin + '/')) return RAILWAY_API;
+    if (isProd) {
+      if (!base.startsWith('https://')) base = base.replace(/^http:\/\//i, 'https://');
+      if (base === origin || base.startsWith(origin + '/')) return RAILWAY_API;
+    }
   }
   return base;
 }
 
-const API_BASE_URL = getApiBaseUrl();
-
 // Debug: en desarrollo, saber a qué URL se conecta
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
-  console.log('[API] Base URL:', API_BASE_URL);
+  console.log('[API] Base URL:', getApiBaseUrl());
 }
 
 interface ApiResponse<T> {
@@ -45,11 +40,14 @@ interface ApiResponse<T> {
 }
 
 class ApiClient {
-  private baseURL: string;
   private token: string | null = null;
 
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
+  /** Resuelve la URL en cada petición para evitar usar Vercel por error (405) */
+  private get baseURL(): string {
+    return getApiBaseUrl();
+  }
+
+  constructor(_unused?: string) {
     // Load token from localStorage
     this.token = localStorage.getItem('auth_token');
   }
@@ -554,4 +552,4 @@ class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient(API_BASE_URL);
+export const apiClient = new ApiClient();

@@ -36,11 +36,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Feature flag: Use API or local auth
-const USE_API_ENV = import.meta.env.VITE_USE_API === 'true' || import.meta.env.VITE_API_URL;
+const USE_API_ENV = import.meta.env.VITE_USE_API === 'true' || !!import.meta.env.VITE_API_URL;
 
-// Helper function to check if we should use API (with fallback to local)
+// En Vercel (producción) siempre usar la API (backend en Railway)
 const shouldUseAPI = () => {
-  return USE_API_ENV; // Will fallback to local auth if API calls fail
+  if (typeof window !== 'undefined' && window.location?.origin?.includes('vercel.app')) {
+    return true; // Producción: API en Railway
+  }
+  return USE_API_ENV;
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
