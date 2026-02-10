@@ -69,8 +69,8 @@ function determineScopeByRules(
   const category = hazard.category;
 
   const dataSources: string[] = ['EU Taxonomy Appendix A', 'Asset Characteristics'];
-  let reasoning = '';
-  let applicableConditions: string[] = [];
+  const reasoning = '';
+  const applicableConditions: string[] = [];
 
   // TEMPERATURE HAZARDS
   if (category === HazardCategory.TEMPERATURE) {

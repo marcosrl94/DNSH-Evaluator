@@ -116,7 +116,7 @@ export const verifyResourceOrganization = async (
     }
 
     let tableName: string;
-    let idColumn: string = 'id';
+    const idColumn: string = 'id';
 
     switch (resourceType) {
       case 'operations':

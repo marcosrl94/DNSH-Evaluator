@@ -8,10 +8,10 @@ import { ActiveContextProvider } from './context/ActiveContext';
 import { OnlineUsersProvider } from './context/OnlineUsersContext';
 import { ToastProvider } from './components/Toast';
 import { hasPermission } from './services/auth';
-import { AssetDnshEvaluation, Operation, DnshObjective } from './types';
+import { Operation, DnshObjective } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
 import { logger } from './utils/logger';
-import { getAllOperations, getAllClients, getOperation, dataStore, updateAssetEvaluation, updateOperation as updateOperationInStore } from './services/dataManagement';
+import { getAllOperations, getAllClients, getOperation, dataStore, updateOperation as updateOperationInStore } from './services/dataManagement';
 import { socketService } from './src/services/socketService';
 import PalantirLoader from './components/PalantirLoader';
 import { AppSidebar } from './components/AppSidebar';
@@ -116,67 +116,27 @@ const AuthenticatedApp: React.FC = () => {
     }
   }, [selectedOperationId, selectedAssetId]);
 
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-black">
-        <PalantirLoader size="lg" text="INITIALIZING" />
-      </div>
-    );
-  }
-
-  // Security: Always show login page if not authenticated
-  if (!user) {
-    return (
-      <Suspense fallback={
-        <div className="flex items-center justify-center h-screen bg-black">
-          <PalantirLoader size="lg" text="LOADING" />
-        </div>
-      }>
-        <LoginPage />
-      </Suspense>
-    );
-  }
-
-  if (!user.permissions || !hasPermission(user, 'canViewOperations')) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
-        <div className="text-center">
-          <Shield className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Access Denied</h2>
-          <p className="text-slate-600">Your account does not have the required permissions.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Memoize selected entities to avoid recalculation
+  // Memoize selected entities and handlers (must be before any early return - rules of hooks)
   const selectedClient = useMemo(
     () => clients.find(c => c.id === selectedClientId),
     [clients, selectedClientId]
   );
-  
   const selectedOperation = useMemo(
     () => operations.find(op => op.id === selectedOperationId),
     [operations, selectedOperationId]
   );
-  
   const selectedAsset = useMemo(
     () => selectedOperation?.assets.find(a => a.id === selectedAssetId),
     [selectedOperation, selectedAssetId]
   );
-
-  // Memoize client operations
   const clientOperations = useMemo(
     () => selectedClient ? operations.filter(op => op.clientId === selectedClient.id) : [],
     [operations, selectedClient]
   );
 
   const handleUpdateOperation = useCallback((updatedOperation: Operation) => {
-    // Update both local state and data store for consistency
     try {
       updateOperationInStore(updatedOperation);
-      // State will be updated automatically via subscription
     } catch (error) {
       logger.error('Error updating operation:', error);
     }
@@ -203,13 +163,7 @@ const AuthenticatedApp: React.FC = () => {
     }
   }, []);
 
-  const navigateToDnshEvaluation = useCallback((id: string) => {
-    setSelectedOperationId(id);
-    setCurrentView('dnsh-evaluation');
-  }, []);
-
   const navigateToAssetEvaluation = useCallback((assetId: string) => {
-    // Navigate to unified DNSH evaluation with asset selected
     const asset = operations.find(op => op.assets.some(a => a.id === assetId))?.assets.find(a => a.id === assetId);
     if (asset) {
       const operation = operations.find(op => op.assets.some(a => a.id === assetId));
@@ -221,31 +175,6 @@ const AuthenticatedApp: React.FC = () => {
     }
   }, [operations]);
 
-  const handleSaveAssetEvaluation = useCallback((evaluation: AssetDnshEvaluation) => {
-    // Update both local state and data store for consistency
-    try {
-      // Update in data store (this will notify all subscribers)
-      if (updateAssetEvaluation(evaluation.assetId, evaluation)) {
-        // Also update local state for immediate UI update
-        if (selectedOperation && selectedAsset) {
-          const updatedOperation = {
-            ...selectedOperation,
-            assets: selectedOperation.assets.map(a =>
-              a.id === selectedAsset.id
-                ? { ...a, dnshEvaluation: evaluation }
-                : a
-            )
-          };
-          updateOperationInStore(updatedOperation);
-          // State will be updated automatically via subscription
-        }
-      }
-    } catch (error) {
-      logger.error('Error saving asset evaluation:', error);
-    }
-  }, [selectedOperation, selectedAsset]);
-
-  // Memoize navigation handlers
   const handleNavigateToDnshEvaluationWithAsset = useCallback((operationId: string, assetId?: string | null) => {
     setSelectedOperationId(operationId);
     setSelectedAssetId(assetId || null);
@@ -253,24 +182,20 @@ const AuthenticatedApp: React.FC = () => {
   }, []);
 
   const handleNavigateToClientDnshEvaluation = useCallback((clientId: string) => {
-    // Unificar: navegar a la evaluación detallada de la primera operación del cliente
     const clientOps = operations.filter(op => op.clientId === clientId);
     if (clientOps.length > 0) {
-      // Navegar a la primera operación del cliente y luego a la evaluación detallada
       setSelectedClientId(clientId);
       setSelectedOperationId(clientOps[0].id);
-      setSelectedAssetId(null); // Empezar en vista Portfolio
+      setSelectedAssetId(null);
       setCurrentView('dnsh-evaluation');
     } else {
-      // Si no hay operaciones, mantener en client-detail
       setSelectedClientId(clientId);
       setCurrentView('client-detail');
     }
   }, [operations]);
 
-  const handleNavigateToDnshObjective = useCallback((objective: DnshObjective) => {
+  const handleNavigateToDnshObjective = useCallback((_objective: DnshObjective) => {
     setCurrentView('dnsh-evaluation');
-    // Store the objective to navigate to in state (we'll handle this in DnshEvaluationPage)
   }, []);
 
   const handleBackToOperationDetail = useCallback(() => {
@@ -286,7 +211,7 @@ const AuthenticatedApp: React.FC = () => {
     setCurrentView('operation-list');
   }, []);
 
-  const handleNavigateToDnshEvaluationFromMap = useCallback((operationId: string, objective?: DnshObjective) => {
+  const handleNavigateToDnshEvaluationFromMap = useCallback((operationId: string, _objective?: DnshObjective) => {
     const operation = operations.find(op => op.id === operationId);
     if (operation) {
       setSelectedOperationId(operationId);
@@ -323,7 +248,6 @@ const AuthenticatedApp: React.FC = () => {
         );
       case 'client-detail':
         if (!selectedClient) {
-          // No client selected, redirect to operation list
           return (
             <div className={`flex flex-col items-center justify-center h-full p-8 transition-colors ${
               theme === 'dark' ? 'bg-black text-white' : 'bg-white text-gray-900'
@@ -359,8 +283,6 @@ const AuthenticatedApp: React.FC = () => {
             />
           </Suspense>
         );
-      // client-dnsh-evaluation removed - unified in dnsh-evaluation
-      // All DNSH evaluations now go through DnshEvaluationEnhancedPage
       case 'map-viewer':
         return (
           <Suspense fallback={<LoadingFallback />}>
@@ -401,7 +323,6 @@ const AuthenticatedApp: React.FC = () => {
         );
       case 'operation-detail':
         if (!selectedOperation) {
-          // No operation selected, redirect to operation list
           return (
             <div className={`flex flex-col items-center justify-center h-full p-8 transition-colors ${
               theme === 'dark' ? 'bg-black text-white' : 'bg-white text-gray-900'
@@ -440,7 +361,6 @@ const AuthenticatedApp: React.FC = () => {
         );
       case 'dnsh-evaluation':
         if (!selectedOperation) {
-          // No operation selected, redirect to operation list
           return (
             <div className={`flex flex-col items-center justify-center h-full p-8 transition-colors ${
               theme === 'dark' ? 'bg-black text-white' : 'bg-white text-gray-900'
@@ -483,6 +403,7 @@ const AuthenticatedApp: React.FC = () => {
         );
     }
   }, [
+    theme,
     currentView,
     operations,
     clients,
@@ -503,6 +424,40 @@ const AuthenticatedApp: React.FC = () => {
     handleBackToOperationList,
     handleNavigateToDnshEvaluationFromMap,
   ]);
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-black">
+        <PalantirLoader size="lg" text="INITIALIZING" />
+      </div>
+    );
+  }
+
+  // Security: Always show login page if not authenticated
+  if (!user) {
+    return (
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-screen bg-black">
+          <PalantirLoader size="lg" text="LOADING" />
+        </div>
+      }>
+        <LoginPage />
+      </Suspense>
+    );
+  }
+
+  if (!user.permissions || !hasPermission(user, 'canViewOperations')) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50">
+        <div className="text-center">
+          <Shield className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Access Denied</h2>
+          <p className="text-slate-600">Your account does not have the required permissions.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex h-screen overflow-hidden font-sans transition-colors ${

@@ -252,7 +252,7 @@ export const findNearbyWaterRiskZones = async (
   const wriData = await getWRIAqueductData(assetLat, assetLng);
   
   // Start with static zones
-  let zones = WATER_RISK_ZONES.filter(zone => {
+  const zones = WATER_RISK_ZONES.filter(zone => {
     const distance = calculateDistanceToWaterRisk(assetLat, assetLng, zone);
     zone.distanceFromAssetKm = distance;
     return distance <= radiusKm;

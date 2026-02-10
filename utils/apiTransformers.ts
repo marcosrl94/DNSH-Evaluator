@@ -5,7 +5,7 @@
  * Eliminates code duplication across data management services
  */
 
-import { Operation, Client, Asset, AssetDnshEvaluation } from '../types';
+import { Operation, Client, Asset } from '../types';
 import { logger } from './logger';
 
 /**

@@ -1,4 +1,4 @@
-import { HazardType, ClimateScenario, ClimateScenarioConfig, ClimateMetrics, HazardThreshold, Asset } from '../types';
+import { HazardType, ClimateScenario, ClimateMetrics, Asset } from '../types';
 import { getScenarioById } from '../constants/climateScenarios';
 
 /**
@@ -8,7 +8,7 @@ export const checkHazardThreshold = (
   hazard: HazardType,
   scenario: ClimateScenario,
   horizon: '2030' | '2050' | '2100',
-  asset?: Asset
+  _asset?: Asset
 ): { exceeds: boolean; value: number; threshold: number; metric: string } => {
   if (!hazard.threshold) {
     // If no threshold defined, consider it material if intensity > 0.3

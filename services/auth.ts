@@ -9,8 +9,8 @@ const DEFAULT_GOOGLE_CLIENT_ID = '169907416354-f7a2tcrkhtq4pbel40tc2ho6c84npkd2.
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
 // Global callback handler for Google Sign In
-let googleSignInCallback: ((user: User) => void) | null = null;
-let googleSignInErrorCallback: ((error: Error) => void) | null = null;
+const googleSignInCallback: ((user: User) => void) | null = null;
+const googleSignInErrorCallback: ((error: Error) => void) | null = null;
 
 // Global flag to prevent multiple script loads
 let scriptLoading = false;

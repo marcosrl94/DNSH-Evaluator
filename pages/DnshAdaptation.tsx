@@ -335,6 +335,18 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
     }
   };
 
+  // Memoize at component level (hooks cannot be inside renderStepContent)
+  const hazardScopeStatus = useMemo(() => {
+    const status: Record<string, 'In Scope' | 'Out of Scope' | 'Not Set'> = {};
+    if (selectedAsset) {
+      EU_TAXONOMY_HAZARDS.forEach(hazard => {
+        const scope = selectedAsset.attributes.adaptationHazardScope?.[hazard.id];
+        status[hazard.id] = scope === 'In Scope' ? 'In Scope' : scope === 'Out of Scope' ? 'Out of Scope' : 'Not Set';
+      });
+    }
+    return status;
+  }, [selectedAsset]);
+
   const renderStepContent = () => {
       // Check if selected hazard is out of scope
       const isSelectedHazardOutOfScope = selectedAsset && selectedHazard
@@ -363,18 +375,6 @@ const DnshAdaptationPage: React.FC<Props> = ({ operation, onBack, embedded = fal
               <p className={`text-xs mt-2 font-mono transition-colors ${themeClasses.text.tertiary}`}>USE_EYE_ICON_TO_TOGGLE_MAP_LAYERS <Eye size={12} className="inline"/>.</p>
           </div>
       );
-
-      // Get scope status for all hazards for this asset
-      const hazardScopeStatus = useMemo(() => {
-        const status: Record<string, 'In Scope' | 'Out of Scope' | 'Not Set'> = {};
-        if (selectedAsset) {
-          EU_TAXONOMY_HAZARDS.forEach(hazard => {
-            const scope = selectedAsset.attributes.adaptationHazardScope?.[hazard.id];
-            status[hazard.id] = scope === 'In Scope' ? 'In Scope' : scope === 'Out of Scope' ? 'Out of Scope' : 'Not Set';
-          });
-        }
-        return status;
-      }, [selectedAsset]);
 
       return (
         <div className="space-y-6 animate-fadeIn">
