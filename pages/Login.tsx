@@ -312,41 +312,32 @@ const LoginPage: React.FC = () => {
         }
         
         // Initialize Google with callback - ONLY ONCE
-        // CRITICAL: Configure for redirect-only mode, no popups, no One Tap
-        // IMPORTANT: Completely disable One Tap and force redirect
-        // Normalize redirect URI to match Google Cloud Console exactly (no trailing slash)
-        const normalizedRedirectUri = window.location.origin.replace(/\/$/, '');
-        
+        // CRÍTICO: Usar POPUP, no redirect. En redirect Google hace POST a nuestro dominio
+        // y Vercel (estático) devuelve 405. En popup, el credential llega por callback JS
+        // y nosotros hacemos POST a Railway.
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback_uri: normalizedRedirectUri, // Explicit redirect URI (normalized, no trailing slash)
           callback: async (response: { credential: string }) => {
             try {
               clearError();
               setLocalError(null);
-              // isLoading is managed by AuthContext, no need to set it manually
               await loginWithGoogle(rememberMe, keepSignedIn, response.credential);
               setLoginSuccess(true);
             } catch (err: any) {
               setLocalError(err.message || 'Error al iniciar sesión con Google');
             }
           },
-          // CRITICAL: Completely disable One Tap
           auto_select: false,
           cancel_on_tap_outside: true,
-          // Disable One Tap completely - this prevents gsi/select popup
           itp_support: false,
-          // Force redirect mode
-          ux_mode: 'redirect' as any,
+          ux_mode: 'popup', // Popup: credential via callback -> POST a Railway. Redirect: POST a Vercel -> 405
         });
         
         // CRITICAL: Ensure prompt() is never called (One Tap)
         // This prevents the gsi/select popup that's causing the issue
         if (window.google?.accounts?.id?.prompt) {
-          const originalPrompt = window.google.accounts.id.prompt;
           window.google.accounts.id.prompt = () => {
-            // Completely disable - do nothing
-            console.log('One Tap (prompt) disabled - using redirect mode only');
+            // Desactivar One Tap - solo usamos el botón en modo popup
           };
         }
 
@@ -358,10 +349,6 @@ const LoginPage: React.FC = () => {
             existingButton.remove();
           }
 
-          // Render button (Google may ignore ux_mode, so we'll override clicks)
-          // Normalize redirect URI to match Google Cloud Console exactly (no trailing slash)
-          const normalizedRedirectUri = window.location.origin.replace(/\/$/, '');
-          
           window.google.accounts.id.renderButton(googleButtonRef.current, {
             type: 'standard',
             theme: 'outline',
@@ -370,9 +357,7 @@ const LoginPage: React.FC = () => {
             width: googleButtonRef.current.offsetWidth || 350,
             logo_alignment: 'left',
             shape: 'rectangular',
-            // Try to set redirect mode (but Google may ignore it)
-            ux_mode: 'redirect',
-            redirect_uri: normalizedRedirectUri,
+            ux_mode: 'popup',
             use_fedcm_for_prompt: false,
             auto_select: false,
             cancel_on_tap_outside: false,
@@ -380,43 +365,9 @@ const LoginPage: React.FC = () => {
           
           window.__GOOGLE_BUTTON_RENDERED__ = true;
           
-          // Log configuration for debugging
-          const baseUrl = window.location.origin.replace(/\/$/, '');
-          console.log('[Google OAuth] Button rendered with redirect mode');
-          console.log('[Google OAuth] Redirect URI:', baseUrl);
-          console.log('[Google OAuth] Make sure this URI is in Google Cloud Console:');
-          console.log('[Google OAuth]   - Authorized JavaScript origins:', baseUrl);
-          console.log('[Google OAuth]   - Authorized redirect URIs:', baseUrl, 'and', baseUrl + '/');
-          
-          // Less aggressive approach: Trust ux_mode: 'redirect' to work
-          // Only add a fallback monitor that checks if redirect actually happened
-          // This prevents the "message port closed" errors by not interfering with Google's handlers
-          const monitorRedirect = () => {
-            const googleButton = googleButtonRef.current?.querySelector('div[role="button"]') as HTMLElement;
-            if (!googleButton) return;
-            
-            // Store original href to detect if we're still on the same page
-            const originalHref = window.location.href;
-            
-            // Add a lightweight click listener that only monitors, doesn't prevent
-            googleButton.addEventListener('click', () => {
-              // Check after a delay if redirect happened
-              setTimeout(() => {
-                // If we're still on the same page after 1.5 seconds, force redirect
-                if (window.location.href === originalHref) {
-                  console.log('[Google OAuth] Fallback: Redirect did not occur, forcing redirect');
-                  const redirectUri = encodeURIComponent(baseUrl);
-                  const scope = encodeURIComponent('openid email profile');
-                  const nonce = Date.now().toString() + Math.random().toString(36).substring(7);
-                  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
-                  window.location.href = authUrl;
-                }
-              }, 1500);
-            }, { once: true });
-          };
-          
-          // Monitor after button is rendered
-          setTimeout(monitorRedirect, 500);
+          if (import.meta.env.DEV) {
+            console.log('[Google OAuth] Button rendered (popup mode)');
+          }
         } catch (renderError) {
           // Safely convert error to string
           const errorMsg = renderError instanceof Error ? renderError.message : String(renderError || 'Unknown error');

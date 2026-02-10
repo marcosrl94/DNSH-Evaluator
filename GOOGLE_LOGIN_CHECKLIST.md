@@ -29,8 +29,10 @@ En **Railway** → backend → **Variables**:
 
 En [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials):
 
-- **Authorized JavaScript origins**: `https://dnsh-evaluator.vercel.app`
-- **Authorized redirect URIs**: `https://dnsh-evaluator.vercel.app`, `https://dnsh-evaluator.vercel.app/`
+- **Authorized JavaScript origins**: `https://dnsh-evaluator.vercel.app` (obligatorio para popup)
+- **Authorized redirect URIs**: `https://dnsh-evaluator.vercel.app`, `https://dnsh-evaluator.vercel.app/` (por si acaso)
+
+> **Nota**: La app usa modo **popup** (no redirect). Google devuelve la credential por callback JS y el front hace POST a Railway. Así evitamos el 405 que Vercel devuelve para POST.
 
 ## 4. Comprobar
 
