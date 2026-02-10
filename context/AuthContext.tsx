@@ -56,9 +56,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [user]);
 
   // Load user from localStorage on mount
+  // PRIORIDAD: Si hay credential de Google en la URL (redirect), procesarla ANTES de cargar storage
   useEffect(() => {
+    const getCredentialFromUrl = (): string | null => {
+      if (typeof window === 'undefined') return null;
+      const params = new URLSearchParams(window.location.search);
+      let c = params.get('credential') || params.get('id_token');
+      if (c) return c;
+      if (window.location.hash) {
+        try {
+          const hash = new URLSearchParams(window.location.hash.substring(1));
+          c = hash.get('id_token') || hash.get('credential');
+        } catch {
+          const h = window.location.hash.substring(1);
+          if (h.startsWith('id_token=')) c = h.split('&')[0].slice(9);
+          else if (h.startsWith('credential=')) c = h.split('&')[0].slice(11);
+        }
+      }
+      return c || null;
+    };
+
     const loadStoredUser = async () => {
       try {
+        // Google OAuth redirect: procesar credential antes que nada
+        const credential = getCredentialFromUrl();
+        if (credential) {
+          try {
+            await loginWithGoogle(false, true, credential);
+            window.history.replaceState({}, document.title, window.location.pathname || '/');
+            return;
+          } catch (e) {
+            logger.error('Google OAuth callback failed:', e);
+            setError((e as Error)?.message || 'Error al procesar login de Google');
+            setIsLoading(false);
+          }
+        }
+
         if (!isSessionValid()) {
           setIsLoading(false);
           return;

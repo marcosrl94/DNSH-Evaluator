@@ -31,6 +31,11 @@ function getApiBaseUrl(): string {
 
 const API_BASE_URL = getApiBaseUrl();
 
+// Debug: en desarrollo, saber a qué URL se conecta
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  console.log('[API] Base URL:', API_BASE_URL);
+}
+
 interface ApiResponse<T> {
   data?: T;
   error?: {
@@ -86,13 +91,15 @@ class ApiClient {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        // Try to parse error response
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         try {
           const errorData = await response.json();
-          errorMessage = errorData.error?.message || errorData.message || errorMessage;
+          errorMessage = errorData.error || errorData.message || errorMessage;
         } catch {
-          // Response is not JSON, use default message
+          // Response is not JSON
+        }
+        if (response.status === 405) {
+          errorMessage = `405 Method Not Allowed. La petición fue a la URL incorrecta. Verifica que la API apunte a Railway (${url})`;
         }
 
         // Handle specific status codes
