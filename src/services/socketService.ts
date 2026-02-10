@@ -25,12 +25,16 @@ class SocketService {
   private token: string | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
 
-  /** Conectar si usamos API (vercel.app siempre, o cuando hay VITE_USE_API/VITE_API_URL) */
+  /** Conectar cuando: vercel.app, o API activa, o hay VITE_SOCKET_URL */
   private shouldConnect(): boolean {
     if (typeof window !== 'undefined' && window.location?.origin?.includes('vercel.app')) {
       return true;
     }
-    return import.meta.env.VITE_USE_API === 'true' || !!import.meta.env.VITE_API_URL;
+    return (
+      import.meta.env.VITE_USE_API === 'true' ||
+      !!import.meta.env.VITE_API_URL ||
+      !!import.meta.env.VITE_SOCKET_URL
+    );
   }
 
   async connect(token: string) {
@@ -55,8 +59,12 @@ class SocketService {
       timeout: 20000,
     });
 
+    this.socket.on('connect_error', (err: Error) => {
+      logger.warn('Socket.IO connect_error:', err.message);
+    });
+
     this.socket.on('connect', () => {
-      logger.info('Socket.IO connected');
+      logger.info('Socket.IO connected', socketUrl);
       // Request user info to populate online users list
       this.socket?.emit('users:get-list');
       // Rejoin rooms if we were in any
