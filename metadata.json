@@ -1,5 +1,6 @@
 {
   "name": "EcoInvest DNSH Evaluator",
+  "deployTrigger": "2026-02-10",
   "description": "A comprehensive Project Finance ESG tool to evaluate EU Taxonomy DNSH criteria, focusing on Climate Change Adaptation (Objective #2) with geospatial risk analysis.",
   "requestFramePermissions": []
 }
