@@ -9,19 +9,17 @@ import { logger } from '../../utils/logger';
 
 const envSocketUrl = (import.meta.env.VITE_SOCKET_URL || '').trim();
 const isProd = import.meta.env.PROD;
-const FALLBACK_PRODUCTION_SOCKET = 'https://dnsh-evaluator-production.up.railway.app';
+const RAILWAY_SOCKET = 'https://dnsh-evaluator-production.up.railway.app';
 
 function getSocketUrl(): string {
-  let url = envSocketUrl
-    ? envSocketUrl
-    : FALLBACK_PRODUCTION_SOCKET;
+  let url = envSocketUrl?.trim() || RAILWAY_SOCKET;
+  if (typeof window !== 'undefined' && isProd && window.location.origin.includes('vercel.app')) {
+    return RAILWAY_SOCKET;
+  }
   if (typeof window !== 'undefined' && isProd) {
     const origin = window.location.origin.replace(/\/$/, '');
     const normalized = url.replace(/\/$/, '');
-    const hasProtocol = /^https?:\/\//i.test(url);
-    if (!hasProtocol || !normalized || normalized === origin || normalized.startsWith(origin + '/')) {
-      url = FALLBACK_PRODUCTION_SOCKET;
-    }
+    if (normalized === origin || normalized.startsWith(origin + '/')) return RAILWAY_SOCKET;
   }
   return url.replace(/\/$/, '');
 }

@@ -6,26 +6,27 @@
 
 const envApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 const isProd = import.meta.env.PROD;
-const FALLBACK_PRODUCTION_API = 'https://dnsh-evaluator-production.up.railway.app/api/v1';
+const RAILWAY_API = 'https://dnsh-evaluator-production.up.railway.app/api/v1';
 
 function getApiBaseUrl(): string {
-  let base = envApiUrl
-    ? envApiUrl
-    : FALLBACK_PRODUCTION_API;
-  // CRÍTICO: Railway devuelve 405 si usas HTTP (301 redirect convierte POST en GET)
-  if (base.startsWith('http://') && isProd) {
-    base = base.replace(/^http:\/\//i, 'https://');
+  let base = envApiUrl?.trim() || RAILWAY_API;
+  base = base.replace(/\/$/, ''); // Sin trailing slash
+
+  if (typeof window === 'undefined') {
+    return base;
   }
-  // En producción: nunca usar el mismo origen (evita 405 si VITE_API_URL apunta al front)
-  if (typeof window !== 'undefined' && isProd) {
+  // En producción en el navegador: SIEMPRE usar Railway, nunca Vercel
+  if (isProd) {
     const origin = window.location.origin.replace(/\/$/, '');
-    const normalized = base.replace(/\/$/, '');
-    const hasProtocol = /^https?:\/\//i.test(base);
-    if (!hasProtocol || !normalized || normalized === origin || normalized.startsWith(origin + '/')) {
-      base = FALLBACK_PRODUCTION_API;
+    const isVercelOrigin = origin.includes('vercel.app');
+    if (isVercelOrigin) {
+      // Forzar Railway; evita POST a Vercel -> 405
+      return RAILWAY_API;
     }
+    if (!base.startsWith('https://')) base = base.replace(/^http:\/\//i, 'https://');
+    if (base === origin || base.startsWith(origin + '/')) return RAILWAY_API;
   }
-  return base.endsWith('/') ? base.slice(0, -1) : base;
+  return base;
 }
 
 const API_BASE_URL = getApiBaseUrl();
