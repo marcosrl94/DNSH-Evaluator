@@ -127,6 +127,12 @@ class SocketService {
     this.listeners.clear();
   }
 
+  /** Reconectar (útil tras fallo); desconecta primero si había socket */
+  async reconnect(token: string) {
+    this.disconnect();
+    await this.connect(token);
+  }
+
   joinOperation(operationId: string) {
     this.lastOperationId = operationId;
     if (this.socket?.connected) {

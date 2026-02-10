@@ -4,8 +4,8 @@
  * NFQ Foundry style with overlapping avatar "balls"
  */
 
-import React, { useState, useEffect } from 'react';
-import { Users, ChevronDown, ChevronUp, Wifi, WifiOff } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Users, ChevronDown, ChevronUp, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useOnlineUsers, OnlineUser } from '../context/OnlineUsersContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -35,6 +35,14 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
     checkConnection();
     const interval = setInterval(checkConnection, 2000);
     return () => clearInterval(interval);
+  }, []);
+
+  const handleReconnect = useCallback(async () => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      await socketService.reconnect(token);
+      setIsConnected(socketService.isConnected());
+    }
   }, []);
 
   // Filter users based on context (excluding current user) - only real users from socket/API
@@ -213,9 +221,18 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
                 </p>
               )}
               {!isConnected && (
-                <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
-                  ⚠️ Sin conexión en tiempo real
-                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <p className={`text-xs ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                    ⚠️ Sin conexión en tiempo real
+                  </p>
+                  <button
+                    onClick={handleReconnect}
+                    className={`text-xs px-2 py-1 rounded ${theme === 'dark' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}
+                    title="Reintentar conexión"
+                  >
+                    <RefreshCw size={12} className="inline" /> Reconectar
+                  </button>
+                </div>
               )}
             </div>
             
@@ -227,9 +244,17 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
                     No hay otros usuarios online
                   </p>
                   {!isConnected && (
-                    <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
-                      Conecta Socket.IO para ver usuarios en tiempo real
-                    </p>
+                    <div className="mt-2 space-y-2">
+                      <p className={`text-xs ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                        Conecta Socket.IO para ver usuarios en tiempo real
+                      </p>
+                      <button
+                        onClick={handleReconnect}
+                        className={`text-xs px-3 py-1.5 rounded font-medium ${theme === 'dark' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}
+                      >
+                        <RefreshCw size={12} className="inline mr-1" /> Reconectar
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (
