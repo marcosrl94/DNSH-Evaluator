@@ -380,70 +380,43 @@ const LoginPage: React.FC = () => {
           
           window.__GOOGLE_BUTTON_RENDERED__ = true;
           
-          // CRITICAL: Intercept clicks IMMEDIATELY to prevent Google from opening popup
-          // We need to do this in multiple phases to catch Google's handlers
-          const interceptClicks = () => {
+          // Log configuration for debugging
+          const baseUrl = window.location.origin.replace(/\/$/, '');
+          console.log('[Google OAuth] Button rendered with redirect mode');
+          console.log('[Google OAuth] Redirect URI:', baseUrl);
+          console.log('[Google OAuth] Make sure this URI is in Google Cloud Console:');
+          console.log('[Google OAuth]   - Authorized JavaScript origins:', baseUrl);
+          console.log('[Google OAuth]   - Authorized redirect URIs:', baseUrl, 'and', baseUrl + '/');
+          
+          // Less aggressive approach: Trust ux_mode: 'redirect' to work
+          // Only add a fallback monitor that checks if redirect actually happened
+          // This prevents the "message port closed" errors by not interfering with Google's handlers
+          const monitorRedirect = () => {
             const googleButton = googleButtonRef.current?.querySelector('div[role="button"]') as HTMLElement;
             if (!googleButton) return;
             
-            // Build redirect URL once
-            // CRITICAL: Normalize redirect URI to match Google Cloud Console exactly
-            // Must match EXACTLY what's configured in Google Cloud Console (no trailing slash)
-            const baseUrl = window.location.origin.replace(/\/$/, '');
-            const redirectUri = encodeURIComponent(baseUrl);
-            const scope = encodeURIComponent('openid email profile');
-            const nonce = Date.now().toString() + Math.random().toString(36).substring(7);
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
+            // Store original href to detect if we're still on the same page
+            const originalHref = window.location.href;
             
-            // Debug: Log redirect URI to help troubleshoot
-            console.log('[Google OAuth] Initiating login...');
-            console.log('[Google OAuth] Redirect URI:', baseUrl);
-            console.log('[Google OAuth] Client ID:', GOOGLE_CLIENT_ID.substring(0, 20) + '...');
-            console.log('[Google OAuth] Make sure this URI is in Google Cloud Console:');
-            console.log('[Google OAuth]   - Authorized JavaScript origins:', baseUrl);
-            console.log('[Google OAuth]   - Authorized redirect URIs:', baseUrl, 'and', baseUrl + '/');
-            
-            // Clone to remove ALL Google handlers
-            const newButton = googleButton.cloneNode(true) as HTMLElement;
-            googleButton.parentNode?.replaceChild(newButton, googleButton);
-            
-            // Add our handler FIRST (capture phase) - this runs before Google's handlers
-            newButton.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopImmediatePropagation();
-              e.stopPropagation();
-              
-              // ALWAYS redirect - never popup
-              window.location.href = authUrl;
-              
-              return false;
-            }, { capture: true });
-            
-            // Also set onclick to prevent any other handlers
-            newButton.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.location.href = authUrl;
-              return false;
-            };
-            
-            // Prevent mousedown/touchstart that might trigger Google's handlers
-            newButton.addEventListener('mousedown', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }, { capture: true });
-            
-            newButton.addEventListener('touchstart', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }, { capture: true });
+            // Add a lightweight click listener that only monitors, doesn't prevent
+            googleButton.addEventListener('click', () => {
+              // Check after a delay if redirect happened
+              setTimeout(() => {
+                // If we're still on the same page after 1.5 seconds, force redirect
+                if (window.location.href === originalHref) {
+                  console.log('[Google OAuth] Fallback: Redirect did not occur, forcing redirect');
+                  const redirectUri = encodeURIComponent(baseUrl);
+                  const scope = encodeURIComponent('openid email profile');
+                  const nonce = Date.now().toString() + Math.random().toString(36).substring(7);
+                  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
+                  window.location.href = authUrl;
+                }
+              }, 1500);
+            }, { once: true });
           };
           
-          // Try multiple times to catch the button
-          setTimeout(interceptClicks, 300);
-          setTimeout(interceptClicks, 600);
-          setTimeout(interceptClicks, 1000);
-          setTimeout(interceptClicks, 1500);
+          // Monitor after button is rendered
+          setTimeout(monitorRedirect, 500);
         } catch (renderError) {
           // Safely convert error to string
           const errorMsg = renderError instanceof Error ? renderError.message : String(renderError || 'Unknown error');
