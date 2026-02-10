@@ -15,7 +15,7 @@ export enum DnshObjective {
   BIODIVERSITY = "Biodiversity & Ecosystems"
 }
 
-export type UserRole = 'Analyst' | 'Manager' | 'Admin' | 'Viewer';
+export type UserRole = 'Analyst' | 'Manager' | 'Admin' | 'Viewer' | 'Evaluator';
 
 // Permissions for fine-grained access control
 export interface UserPermissions {

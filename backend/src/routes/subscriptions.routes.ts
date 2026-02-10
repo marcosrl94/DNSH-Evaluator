@@ -195,9 +195,13 @@ router.post(
         return res.status(400).json({ error: 'No organization assigned' });
       }
 
-      // In production, this would create a Stripe checkout session
-      // For now, return a mock checkout URL
-      const checkoutUrl = process.env.STRIPE_CHECKOUT_URL || `https://checkout.stripe.com/mock-${plan}`;
+      const checkoutUrl = process.env.STRIPE_CHECKOUT_URL;
+      if (!checkoutUrl) {
+        return res.status(503).json({
+          error: 'Suscripciones no configuradas',
+          message: 'Configure STRIPE_CHECKOUT_URL para habilitar upgrades.',
+        });
+      }
 
       return res.json({
         checkoutUrl,

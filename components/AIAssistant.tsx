@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
-import { DEMO_OPERATIONS } from '../constants';
 import { Operation, Asset } from '../types';
 import { formatLargeNumber } from '../utils/common';
 import { logger } from '../utils/logger';
@@ -21,7 +20,7 @@ interface AIAssistantProps {
 }
 
 const AIAssistant: React.FC<AIAssistantProps> = ({ 
-  operations = DEMO_OPERATIONS,
+  operations = [],
   currentOperation = null,
   currentAsset = null 
 }) => {

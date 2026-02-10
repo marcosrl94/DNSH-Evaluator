@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { DEMO_OPERATIONS, DEMO_CLIENTS, DNSH_CHECKLIST_TEMPLATES } from '../constants';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { DNSH_CHECKLIST_TEMPLATES } from '../constants';
 import { getAllMeasures } from '../constants/extendedMeasures';
 import { FileText, Download, Printer, CheckCircle, AlertTriangle, XCircle, MapPin, FileCheck, FileX, Lightbulb, ChevronDown, ChevronUp, Building2, Briefcase, Layers, Sparkles, Edit3, Settings } from 'lucide-react';
 import { Operation, DnshObjective, AssetDnshEvaluation, EvidenceType, Client, Asset } from '../types';
@@ -16,35 +16,32 @@ import { OnlineUsersIndicator } from '../components/OnlineUsersIndicator';
 import { getDefaultConfiguration, getEnabledSections, ReportConfiguration } from '../services/reportConfig';
 import { AIProvider } from '../services/aiProviderService';
 import { logger } from '../utils/logger';
-import { getAllOperations, dataStore, getClient, getOperation, getClientOperations } from '../services/dataManagement';
+import { getClient, getOperation, getClientOperations } from '../services/dataManagement';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 import { useAuth } from '../context/AuthContext';
 
-const ReportsPage: React.FC = () => {
+interface ReportsPageProps {
+  operations?: Operation[];
+  clients?: Client[];
+}
+
+const ReportsPage: React.FC<ReportsPageProps> = ({ operations: propsOperations = [], clients: propsClients = [] }) => {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const themeClasses = getThemeClasses(theme);
+  const operations = Array.isArray(propsOperations) ? propsOperations : [];
+  const clients = Array.isArray(propsClients) ? propsClients : [];
   
-  // Report level selection
   const [reportLevel, setReportLevel] = useState<ReportLevel>(ReportLevel.PORTFOLIO);
-  const [selectedClientId, setSelectedClientId] = useState<string>(() => {
-    try {
-      return (Array.isArray(DEMO_CLIENTS) && DEMO_CLIENTS.length > 0) ? DEMO_CLIENTS[0].id : '';
-    } catch {
-      return '';
-    }
-  });
-  const [selectedOpId, setSelectedOpId] = useState<string>(() => {
-    try {
-      return (Array.isArray(DEMO_OPERATIONS) && DEMO_OPERATIONS.length > 0) ? DEMO_OPERATIONS[0].id : '';
-    } catch {
-      return '';
-    }
-  });
+  const [selectedClientId, setSelectedClientId] = useState<string>(() =>
+    clients.length > 0 ? clients[0].id : ''
+  );
+  const [selectedOpId, setSelectedOpId] = useState<string>(() =>
+    operations.length > 0 ? operations[0].id : ''
+  );
   const [selectedAssetId, setSelectedAssetId] = useState<string>('');
   
-  // UI state
   const [expandedObjectives, setExpandedObjectives] = useState<Set<DnshObjective>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -57,36 +54,17 @@ const ReportsPage: React.FC = () => {
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<string>('');
   const reportRef = useRef<HTMLDivElement>(null);
-  
-  // Get selected entities - use data store for fresh data
-  const [operations, setOperations] = React.useState<Operation[]>([]);
 
-  // Load operations on mount
-  React.useEffect(() => {
-    const loadOperations = async () => {
-      try {
-        const ops = await getAllOperations();
-        setOperations(Array.isArray(ops) ? ops : []);
-      } catch (error) {
-        logger.error('Error loading operations', error, { component: 'Reports', action: 'loadOperations' });
-        setOperations([]);
-      }
-    };
-    loadOperations();
-  }, []);
-  
-  // Subscribe to data store changes
-  React.useEffect(() => {
-    const unsubscribe = dataStore.subscribe(async () => {
-      try {
-        const ops = await getAllOperations();
-        setOperations(Array.isArray(ops) ? ops : []);
-      } catch (error) {
-        logger.error('Error loading operations', error, { component: 'Reports', action: 'subscribeOperations' });
-      }
-    });
-    return unsubscribe;
-  }, []);
+  useEffect(() => {
+    if (clients.length > 0 && !clients.some(c => c.id === selectedClientId)) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [clients, selectedClientId]);
+  useEffect(() => {
+    if (operations.length > 0 && !operations.some(op => op.id === selectedOpId)) {
+      setSelectedOpId(operations[0].id);
+    }
+  }, [operations, selectedOpId]);
   
   const [selectedOperation, setSelectedOperation] = React.useState<Operation | null>(null);
 
@@ -714,7 +692,7 @@ const ReportsPage: React.FC = () => {
               onChange={(e) => setSelectedClientId(e.target.value)}
               className={`${themeClasses.inputClass} text-sm rounded-lg block px-3 py-2 min-w-[200px] shadow-sm`}
             >
-              {Array.isArray(DEMO_CLIENTS) ? DEMO_CLIENTS.map(client => (
+              {Array.isArray(clients) ? clients.map(client => (
                 client && client.id ? <option key={client.id} value={client.id}>{client.name || 'Sin nombre'}</option> : null
               )).filter(Boolean) : null}
             </select>
@@ -725,7 +703,7 @@ const ReportsPage: React.FC = () => {
               onChange={(e) => setSelectedOpId(e.target.value)}
               className={`${themeClasses.inputClass} text-sm rounded-lg block px-3 py-2 min-w-[280px] shadow-sm`}
             >
-              {Array.isArray(DEMO_OPERATIONS) ? DEMO_OPERATIONS.map(op => (
+              {Array.isArray(operations) ? operations.map(op => (
                 op && op.id ? <option key={op.id} value={op.id}>{op.name || 'Sin nombre'}</option> : null
               )).filter(Boolean) : null}
             </select>
@@ -740,7 +718,7 @@ const ReportsPage: React.FC = () => {
                 }}
                 className={`${themeClasses.inputClass} text-sm rounded-lg block px-3 py-2 min-w-[200px] shadow-sm`}
               >
-                {DEMO_OPERATIONS.map(op => (
+                {operations.map(op => (
                   <option key={op.id} value={op.id}>{op.name}</option>
                 ))}
               </select>

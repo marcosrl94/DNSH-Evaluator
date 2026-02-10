@@ -1,15 +1,19 @@
 # Variables de Entorno para Railway
 
-Copia y pega estas variables en Railway → Tu Servicio → Variables
+Copia y pega estas variables en **Railway → Tu Servicio → Variables**.
 
-## 🔴 OBLIGATORIAS (Copia estas exactamente):
+**Frontend en producción:** [https://dnsh-evaluator.vercel.app/](https://dnsh-evaluator.vercel.app/) (Vercel)
+
+## 🔴 OBLIGATORIAS:
 
 ```env
 JWT_SECRET=tu-secret-key-super-segura-genera-una-nueva
-CORS_ORIGIN=https://marcosrl94.github.io
-GOOGLE_CLIENT_ID=169907416354-f7a2tcrkhtq4pbel40tc2ho6c84npkd2.apps.googleusercontent.com
+CORS_ORIGIN=https://dnsh-evaluator.vercel.app
+GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
 NODE_ENV=production
 ```
+
+(Para probar también en local: `CORS_ORIGIN=https://dnsh-evaluator.vercel.app,http://localhost:5173,http://localhost:3000`)
 
 ## 🟡 RECOMENDADAS:
 
@@ -37,6 +41,6 @@ AWS_S3_BUCKET=ecoinvest-evidence-documents
 
 2. **DATABASE_URL**: Railway la configura automáticamente cuando agregas PostgreSQL. NO la agregues manualmente.
 
-3. **CORS_ORIGIN**: Debe incluir la URL de tu frontend en GitHub Pages.
+3. **CORS_ORIGIN**: Debe incluir la URL del frontend en Vercel: `https://dnsh-evaluator.vercel.app`.
 
 4. **PORT**: Railway lo configura automáticamente. NO lo agregues manualmente.

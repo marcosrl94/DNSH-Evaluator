@@ -144,14 +144,11 @@ export const loginWithGoogle = async (
     throw new Error('Window is not available');
   }
 
-  // If no Google Client ID configured, use demo mode
+  // Sin Google Client ID: acceso local (entorno sin OAuth configurado)
   if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID === '') {
-    // Simulate a delay for demo mode to show loading state
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Demo mode: Create a demo Google user
-    const demoGoogleUser: User = {
-      id: `google-demo-${Date.now()}`,
+    const localGoogleUser: User = {
+      id: `google-local-${Date.now()}`,
       email: 'user@gmail.com',
       name: 'Google User',
       role: 'Analyst',
@@ -161,19 +158,15 @@ export const loginWithGoogle = async (
       permissions: getPermissionsForRole('Analyst'),
       lastLogin: new Date().toISOString(),
     };
-    
-    // Store provider info and session
     localStorage.setItem('ecoinvest_auth_provider', 'google-demo');
-    localStorage.setItem('ecoinvest_user', JSON.stringify(demoGoogleUser));
-    
-    if (keepSignedIn || true) { // Default to keep signed in for Google
+    localStorage.setItem('ecoinvest_user', JSON.stringify(localGoogleUser));
+    if (keepSignedIn !== false) {
       localStorage.setItem('ecoinvest_keep_signed_in', 'true');
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + 30);
       localStorage.setItem('ecoinvest_session_expiry', expiryDate.toISOString());
     }
-    
-    return demoGoogleUser;
+    return localGoogleUser;
   }
 
   // IMPORTANT: Real Google OAuth is now handled in Login.tsx component
@@ -229,6 +222,7 @@ export const getPermissionsForRole = (role: UserRole): UserPermissions => {
         canManageEvidence: true,
       };
     case 'Analyst':
+    case 'Evaluator':
       return {
         canViewOperations: true,
         canEditOperations: true,
@@ -267,8 +261,7 @@ export const getPermissionsForRole = (role: UserRole): UserPermissions => {
   }
 };
 
-// Mock database of users (in real app, this would be in a secure database)
-// Passwords are hashed in a real implementation
+// Usuarios locales cuando la API no está activa (VITE_USE_API false). En producción usar API.
 const MOCK_USERS: User[] = [
   {
     id: 'u1',

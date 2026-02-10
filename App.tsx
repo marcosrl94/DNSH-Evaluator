@@ -1,7 +1,6 @@
 
 import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
 import { Shield, AlertTriangle } from 'lucide-react';
-import { DEMO_OPERATIONS, DEMO_CLIENTS } from './constants';
 import { Client } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
@@ -12,7 +11,7 @@ import { hasPermission } from './services/auth';
 import { AssetDnshEvaluation, Operation, DnshObjective } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
 import { logger } from './utils/logger';
-import { getAllOperations, dataStore, updateAssetEvaluation, updateOperation as updateOperationInStore } from './services/dataManagement';
+import { getAllOperations, getAllClients, getOperation, dataStore, updateAssetEvaluation, updateOperation as updateOperationInStore } from './services/dataManagement';
 import { socketService } from './src/services/socketService';
 import PalantirLoader from './components/PalantirLoader';
 import { AppSidebar } from './components/AppSidebar';
@@ -57,36 +56,41 @@ const AuthenticatedApp: React.FC = () => {
   const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [clients, setClients] = useState<Client[]>(DEMO_CLIENTS);
+  const [clients, setClients] = useState<Client[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
 
-  // Load operations on mount
-  useEffect(() => {
-    const loadOperations = async () => {
-      try {
-        const ops = await getAllOperations();
-        setOperations(ops);
-      } catch (error) {
-        logger.error('Error loading operations:', error);
-        // Fallback to demo operations
-        setOperations(DEMO_OPERATIONS);
-      }
-    };
-    loadOperations();
+  const loadData = useCallback(async () => {
+    try {
+      const [ops, cl] = await Promise.all([getAllOperations(), getAllClients()]);
+      setOperations(Array.isArray(ops) ? ops : []);
+      setClients(Array.isArray(cl) ? cl : []);
+    } catch (error) {
+      logger.error('Error loading data:', error);
+    }
   }, []);
 
-  // Subscribe to data store changes
   useEffect(() => {
-    const unsubscribe = dataStore.subscribe(async () => {
-      try {
-        const ops = await getAllOperations();
-        setOperations(ops);
-      } catch (error) {
-        logger.error('Error loading operations:', error);
-      }
-    });
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const unsubscribe = dataStore.subscribe(loadData);
     return unsubscribe;
-  }, []);
+  }, [loadData]);
+
+  // Al cargar una operación seleccionada, traer detalle con assets (el listado GET /operations no incluye assets)
+  useEffect(() => {
+    if (!selectedOperationId) return;
+    getOperation(selectedOperationId)
+      .then((fullOp) => {
+        if (fullOp) {
+          setOperations((prev) =>
+            prev.map((op) => (op.id === selectedOperationId ? fullOp : op))
+          );
+        }
+      })
+      .catch((err) => logger.error('Error loading operation detail:', err));
+  }, [selectedOperationId]);
 
   // Update user presence when navigating
   useEffect(() => {
@@ -296,6 +300,8 @@ const AuthenticatedApp: React.FC = () => {
         return (
           <Suspense fallback={<LoadingFallback />}>
             <UnifiedDashboardPage 
+              operations={operations}
+              clients={clients}
               onNavigateToOperation={navigateToOperation}
               onNavigateToClient={navigateToClient}
               onNavigateToAssetEvaluation={navigateToAssetEvaluation}
@@ -307,6 +313,8 @@ const AuthenticatedApp: React.FC = () => {
         return (
           <Suspense fallback={<LoadingFallback />}>
             <OperationsListPage 
+              operations={operations}
+              clients={clients}
               onNavigateToOperation={navigateToOperation} 
               selectedClientId={selectedClientId} 
               onNavigateToClient={navigateToClient} 
@@ -357,6 +365,8 @@ const AuthenticatedApp: React.FC = () => {
         return (
           <Suspense fallback={<LoadingFallback />}>
             <GlobalMapViewerPage 
+              operations={operations}
+              clients={clients}
               onNavigateToOperation={navigateToOperation}
               onNavigateToAssetEvaluation={navigateToAssetEvaluation}
               onNavigateToDnshEvaluation={handleNavigateToDnshEvaluationFromMap}
@@ -372,7 +382,7 @@ const AuthenticatedApp: React.FC = () => {
       case 'reports':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <ReportsPage />
+            <ReportsPage operations={operations} clients={clients} />
           </Suspense>
         );
       case 'deal-management':
@@ -468,12 +478,14 @@ const AuthenticatedApp: React.FC = () => {
       default:
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <DashboardPage onNavigateToOperation={navigateToOperation} />
+            <DashboardPage operations={operations} clients={clients} onNavigateToOperation={navigateToOperation} />
           </Suspense>
         );
     }
   }, [
     currentView,
+    operations,
+    clients,
     selectedClient,
     selectedOperation,
     selectedAssetId,

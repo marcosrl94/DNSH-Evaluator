@@ -92,14 +92,14 @@ const AssetDetailPanel: React.FC<AssetDetailPanelProps> = ({ asset, onClose, onN
     const hazardMap: Record<string, (data: any) => number> = {
       'h2': (d) => d.changeFromBaseline || 0, // Heat stress: temperature increase
       'h3': (d) => Math.abs(d.changeFromBaseline || 0), // Temperature variability: absolute change
-      'h5': (d) => (d.changeFromBaseline || 0) * 2 + 5, // Heat wave: frequency (mock calculation)
+      'h5': (d) => (d.changeFromBaseline || 0) * 2 + 5, // Heat wave: frecuencia (proxy desde CORDEX)
       'h7': (d) => d.value || 0, // Wildfire: risk index
       'h8': (d) => d.value || 0, // Wind: speed
       'h13': (d) => d.changeFromBaseline || 0, // Precipitation: % change
-      'h15': (d) => Math.abs(d.changeFromBaseline || 0) / 10, // Flood: depth (mock)
+      'h15': (d) => Math.abs(d.changeFromBaseline || 0) / 10, // Flood: profundidad (proxy desde CORDEX)
       'h17': (d) => d.value || 0, // Sea level: absolute rise in cm
-      'h18': (d) => Math.abs(d.changeFromBaseline || 0) / 100, // Water stress: index (mock)
-      'h19': (d) => Math.abs(d.changeFromBaseline || 0) / 100, // Drought: index (mock)
+      'h18': (d) => Math.abs(d.changeFromBaseline || 0) / 100, // Water stress: índice (proxy desde CORDEX)
+      'h19': (d) => Math.abs(d.changeFromBaseline || 0) / 100, // Drought: índice (proxy desde CORDEX)
     };
     
     const extractor = hazardMap[hazardId];

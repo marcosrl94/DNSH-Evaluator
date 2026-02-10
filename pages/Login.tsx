@@ -660,7 +660,7 @@ const LoginPage: React.FC = () => {
                   className="w-full flex justify-center mb-3"
                   style={{ minHeight: '48px', width: '100%' }}
                 />
-                {/* Fallback button - only show if no Client ID (demo mode) */}
+                {/* Botón alternativo cuando no hay Google Client ID configurado */}
                 {!GOOGLE_CLIENT_ID && (
                   <button
                     type="button"
@@ -672,7 +672,6 @@ const LoginPage: React.FC = () => {
                         setLoginSuccess(true);
                       } catch (err: any) {
                         setLocalError(err.message || 'Error al iniciar sesión');
-                        // Safely convert error to string
                         const errorMsg = err instanceof Error ? err.message : String(err || 'Unknown error');
                         console.error('Google login error:', errorMsg);
                       }
@@ -686,7 +685,7 @@ const LoginPage: React.FC = () => {
                       <path fillRule="evenodd" clipRule="evenodd" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                       <path fillRule="evenodd" clipRule="evenodd" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                     </svg>
-                    <span className="truncate">{isLoading ? 'AUTHENTICATING...' : 'CONTINUE WITH GOOGLE (DEMO)'}</span>
+                    <span className="truncate">{isLoading ? 'AUTHENTICATING...' : 'CONTINUE WITH GOOGLE'}</span>
                   </button>
                 )}
                 {/* Loading indicator if Google button is initializing */}

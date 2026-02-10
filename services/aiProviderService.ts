@@ -221,7 +221,7 @@ export function getAvailableProvidersForUser(userEmail: string): AIProvider[] {
     const emailParts = userEmail.split('@');
     const emailDomain = emailParts.length > 1 ? emailParts[1]?.toLowerCase() || '' : '';
     
-    // Demo: Map specific domains to license types
+    // Mapeo de dominios de email a tipo de licencia AI
     const licenseMap: Record<string, UserAILicense> = {
     // Free tier users
     'gmail.com': {

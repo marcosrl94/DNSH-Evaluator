@@ -143,6 +143,18 @@ class DataStore {
     return updated;
   }
 
+  /** Reemplaza toda la lista de operaciones (p. ej. tras cargar desde API). */
+  setOperations(operations: Operation[]): void {
+    this.operations = Array.isArray(operations) ? operations.map(op => ({ ...op })) : [];
+    this.notifyListeners();
+  }
+
+  /** Reemplaza toda la lista de clientes (p. ej. tras cargar desde API). */
+  setClients(clients: Client[]): void {
+    this.clients = Array.isArray(clients) ? clients.map(c => ({ ...c })) : [];
+    this.notifyListeners();
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => {
@@ -156,6 +168,12 @@ class DataStore {
 }
 
 const dataStore = new DataStore();
+
+// Con API activa, la fuente de verdad es el backend: no pre-cargar datos demo
+if (USE_API) {
+  dataStore.setOperations([]);
+  dataStore.setClients([]);
+}
 
 /**
  * Get all operations
@@ -176,7 +194,9 @@ export async function getAllOperations(): Promise<Operation[]> {
           return dataStore.getOperations();
         }
         
-        return response.operations.map(transformApiOperation);
+        const operations = response.operations.map(transformApiOperation);
+        dataStore.setOperations(operations);
+        return operations;
       },
       dataStore.getOperations(),
       'API unavailable, using local store'
@@ -219,7 +239,9 @@ export async function getAllClients(): Promise<Client[]> {
         if (!validateApiResponse(response, ['clients'])) {
           return dataStore.getClients();
         }
-        return response.clients.map(transformApiClient);
+        const clients = response.clients.map(transformApiClient);
+        dataStore.setClients(clients);
+        return clients;
       },
       dataStore.getClients(),
       'API unavailable, using local store'

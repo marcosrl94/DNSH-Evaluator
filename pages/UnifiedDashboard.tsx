@@ -11,20 +11,20 @@ import {
   DollarSign, Percent, BarChart3, TrendingDown, Activity, Globe, List, ChevronRight,
   Building, Layers, Grid, Filter
 } from 'lucide-react';
-import { DEMO_OPERATIONS, DEMO_CLIENTS } from '../constants';
 import { Operation, DnshObjective, Client, Asset } from '../types';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
 import { canDisplayDnshStatus, getSafeDnshStatus } from '../services/dnshValidation';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 import MapViewer from '../components/MapViewer';
-import { getAllOperations, dataStore } from '../services/dataManagement';
 import { logger } from '../utils/logger';
 
 type ViewMode = 'map' | 'list';
 type GranularityLevel = 'company' | 'portfolio' | 'asset';
 
 interface UnifiedDashboardProps {
+  operations: Operation[];
+  clients: Client[];
   onNavigateToOperation: (id: string) => void;
   onNavigateToClient?: (clientId: string) => void;
   onNavigateToAssetEvaluation?: (assetId: string) => void;
@@ -32,6 +32,8 @@ interface UnifiedDashboardProps {
 }
 
 const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({ 
+  operations: propsOperations = [],
+  clients: propsClients = [],
   onNavigateToOperation,
   onNavigateToClient,
   onNavigateToAssetEvaluation,
@@ -44,35 +46,16 @@ const UnifiedDashboardPage: React.FC<UnifiedDashboardProps> = ({
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [operations, setOperations] = useState<Operation[]>([]);
-  const [clients, setClients] = useState<Client[]>(DEMO_CLIENTS);
+  const [operations, setOperations] = useState<Operation[]>(propsOperations);
+  const [clients, setClients] = useState<Client[]>(propsClients);
 
-  // Load operations on mount
   React.useEffect(() => {
-    const loadOperations = async () => {
-      try {
-        const ops = await getAllOperations();
-        setOperations(Array.isArray(ops) ? ops : []);
-      } catch (error) {
-        logger.error('Error loading operations', error, { component: 'UnifiedDashboard', action: 'loadOperations' });
-        setOperations([]);
-      }
-    };
-    loadOperations();
-  }, []);
+    setOperations(Array.isArray(propsOperations) ? propsOperations : []);
+  }, [propsOperations]);
 
-  // Subscribe to data store changes
   React.useEffect(() => {
-    const unsubscribe = dataStore.subscribe(async () => {
-      try {
-        const ops = await getAllOperations();
-        setOperations(Array.isArray(ops) ? ops : []);
-      } catch (error) {
-        logger.error('Error loading operations', error, { component: 'UnifiedDashboard', action: 'subscribeOperations' });
-      }
-    });
-    return unsubscribe;
-  }, []);
+    setClients(Array.isArray(propsClients) ? propsClients : []);
+  }, [propsClients]);
 
   // Helper to safely get operations array - must be defined before useMemo
   const safeOperations = Array.isArray(operations) ? operations : [];

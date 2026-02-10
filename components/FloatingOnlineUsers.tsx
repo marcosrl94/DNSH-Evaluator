@@ -37,7 +37,7 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  // Filter users based on context (excluding current user)
+  // Filter users based on context (excluding current user) - only real users from socket/API
   let relevantUsers = onlineUsers.filter(u => u.id !== user?.id);
   if (assetId) {
     relevantUsers = usersInAsset(String(assetId)).filter(u => u.id !== user?.id);
@@ -45,46 +45,8 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
     relevantUsers = usersInOperation(String(operationId)).filter(u => u.id !== user?.id);
   }
 
-  // Demo users for testing - Always show in development mode
-  // In production, only show if no real users are online
-  const [demoUsers] = useState(() => {
-    return [
-      {
-        id: 'demo-user-1',
-        name: 'Ana García',
-        email: 'ana@ecoinvest.com',
-        role: 'Analyst',
-        avatarUrl: undefined,
-        currentOperationId: operationId,
-        currentAssetId: assetId,
-        lastSeen: new Date(),
-      },
-      {
-        id: 'demo-user-2',
-        name: 'Carlos Ruiz',
-        email: 'carlos@ecoinvest.com',
-        role: 'Manager',
-        avatarUrl: undefined,
-        currentOperationId: operationId,
-        currentAssetId: undefined,
-        lastSeen: new Date(),
-      },
-      {
-        id: 'demo-user-3',
-        name: 'María López',
-        email: 'maria@ecoinvest.com',
-        role: 'Analyst',
-        avatarUrl: undefined,
-        currentOperationId: undefined,
-        currentAssetId: undefined,
-        lastSeen: new Date(),
-      },
-    ] as OnlineUser[];
-  });
-
-  // Use real users if available, otherwise show demo users in dev mode
-  // Always show demo users in dev mode to demonstrate the feature
-  const displayUsers = relevantUsers.length > 0 ? relevantUsers : demoUsers;
+  // Solo mostrar usuarios reales conectados (sin datos demo)
+  const displayUsers = relevantUsers;
 
   const maxVisible = 4;
   const visibleUsers = displayUsers.slice(0, maxVisible);
@@ -214,12 +176,9 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
             )}
           </div>
 
-          {/* Count Text - More prominent */}
+          {/* Count Text - Solo usuarios reales conectados */}
           <span className={`text-sm font-bold ${displayUsers.length > 0 ? themeClasses.text.primary : themeClasses.text.tertiary} whitespace-nowrap`}>
             {displayUsers.length} {displayUsers.length === 1 ? 'online' : 'online'}
-            {import.meta.env.DEV && relevantUsers.length === 0 && displayUsers.length > 0 && (
-              <span className={`text-[10px] ml-1 ${themeClasses.text.tertiary}`}>(demo)</span>
-            )}
           </span>
 
           {/* Expand Icon */}

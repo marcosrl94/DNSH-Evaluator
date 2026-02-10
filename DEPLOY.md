@@ -4,6 +4,8 @@ Esta aplicación puede desplegarse en varias plataformas. Aquí tienes las opcio
 
 ## 🚀 Opción 1: Vercel (Recomendado - Más Fácil)
 
+**App en producción:** [https://dnsh-evaluator.vercel.app/](https://dnsh-evaluator.vercel.app/)
+
 ### Pasos:
 
 1. **Instala Vercel CLI** (opcional, también puedes usar la web):
@@ -20,13 +22,18 @@ Esta aplicación puede desplegarse en varias plataformas. Aquí tienes las opcio
    - Conecta tu repositorio de GitHub
    - Selecciona este proyecto
    - Vercel detectará automáticamente que es un proyecto Vite
-   - (Opcional) Agrega la variable de entorno `GEMINI_API_KEY` si quieres usar IA real
    - ¡Listo! Se desplegará automáticamente en cada push a `main`
 
-3. **(Opcional) Configurar variables de entorno**:
-   - Ve a tu proyecto en Vercel Dashboard
-   - Settings → Environment Variables
-   - Agrega: `GEMINI_API_KEY` con tu clave (solo si quieres usar IA real)
+3. **Variables de entorno en Vercel** (Settings → Environment Variables). Copia desde **`vercel.env.example`** o añade:
+   | Variable | Valor |
+   |----------|--------|
+   | `VITE_USE_API` | `true` |
+   | `VITE_API_URL` | `https://dnsh-evaluator-production.up.railway.app/api/v1` |
+   | `VITE_SOCKET_URL` | `https://dnsh-evaluator-production.up.railway.app` |
+   | `VITE_GOOGLE_CLIENT_ID` | (opcional) tu Client ID |
+   | `GEMINI_API_KEY` | (opcional) |
+
+   **Backend en Railway:** En Railway → Variables pon `CORS_ORIGIN=https://dnsh-evaluator.vercel.app`. Ver [backend/RAILWAY_VARIABLES.md](backend/RAILWAY_VARIABLES.md).
 
 **Ventajas:**
 - ✅ Despliegue automático en cada push

@@ -269,21 +269,18 @@ async function generateWithMistral(
 }
 
 /**
- * Generate with Local LLM (fallback/mock)
+ * Generación con LLM local (Ollama, LM Studio, etc.).
+ * Para usarlo: configure un servidor LLM y conecte esta función (p. ej. VITE_LOCAL_LLM_URL).
  */
 async function generateWithLocal(
   request: AIGenerationRequest,
   config: AIProviderConfig
 ): Promise<AIGenerationResponse> {
-  // In a real implementation, this would call a local LLM API
-  // For now, we'll return a mock response indicating local generation
-  // In production, this could use Ollama, LM Studio, or similar
-  
   return {
-    content: `[Generación Local - No disponible en modo demo]\n\nPara usar modelos locales, configure un servidor LLM local (Ollama, LM Studio, etc.) y actualice esta función para conectarse a él.\n\nPrompt recibido: ${request.prompt.substring(0, 200)}...`,
+    content: '',
     model: config.model,
     provider: request.provider,
-    error: 'Local LLM not configured'
+    error: 'Modelo local no configurado. Configure un servidor LLM (Ollama, LM Studio) en la configuración de proveedores para usar generación local.'
   };
 }
 

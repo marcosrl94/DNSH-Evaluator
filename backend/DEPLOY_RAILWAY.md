@@ -30,12 +30,14 @@ Ve a tu servicio → "Variables" y agrega:
 
 ```env
 JWT_SECRET=<genera-uno-seguro>
-CORS_ORIGIN=https://marcosrl94.github.io
-GOOGLE_CLIENT_ID=169907416354-f7a2tcrkhtq4pbel40tc2ho6c84npkd2.apps.googleusercontent.com
+CORS_ORIGIN=https://dnsh-evaluator.vercel.app
+GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
 NODE_ENV=production
 API_PREFIX=/api/v1
 ALLOWED_DOMAINS=gmail.com,googlemail.com
 ```
+
+(El front está en [https://dnsh-evaluator.vercel.app/](https://dnsh-evaluator.vercel.app/); en Vercel configura `VITE_API_URL` y `VITE_SOCKET_URL` con la URL pública de este servicio en Railway.)
 
 **Para generar JWT_SECRET:**
 ```bash

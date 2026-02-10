@@ -287,7 +287,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
         } else {
-          // Local auth mode - use credential if provided, otherwise demo mode
+          // Auth local: usar credential si viene del botón de Google sin Client ID
           if (credential) {
             // Decode credential and create user locally
             try {
@@ -320,7 +320,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               throw localError;
             }
           } else {
-            // Demo mode - no credential provided
+            // Sin credential: flujo local (botón "Continuar con Google" sin Client ID)
             const googleUser = await localAuthService.loginWithGoogle(rememberMe, keepSignedIn);
             const storedUser = localStorage.getItem('ecoinvest_user');
             if (storedUser) {

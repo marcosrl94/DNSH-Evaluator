@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, Plus, ArrowRight, CheckCircle, XCircle, AlertTriangle, HelpCircle, Building2, Users, Archive, X } from 'lucide-react';
-import { DEMO_OPERATIONS, DEMO_CLIENTS } from '../constants';
 import { Operation, AssetDnshEvaluation, Client } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
-import { getActiveOperations, dataStore, getClientOperations, archiveOperation, deleteOperation } from '../services/dataManagement';
+import { getClientOperations, archiveOperation, deleteOperation } from '../services/dataManagement';
 import { useAuth } from '../context/AuthContext';
 import { logger } from '../utils/logger';
 
 interface Props {
+  operations: Operation[];
+  clients: Client[];
   onNavigateToOperation: (id: string) => void;
   selectedClientId?: string | null;
   onNavigateToClient?: (clientId: string) => void;
@@ -97,43 +98,21 @@ const calculateOperationDnshStatus = (operation: Operation): {
   };
 };
 
-const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedClientId, onNavigateToClient }) => {
+const OperationsListPage: React.FC<Props> = ({ operations: propsOperations = [], clients: propsClients = [], onNavigateToOperation, selectedClientId, onNavigateToClient }) => {
   const { theme } = useTheme();
   const themeClasses = getThemeClasses(theme);
   const { user } = useAuth();
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [showClients, setShowClients] = useState(!selectedClientId); // Show clients if none selected
-  const [operations, setOperations] = useState<Operation[]>([]);
+  const [showClients, setShowClients] = useState(!selectedClientId);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Load active operations on mount (exclude archived)
-  useEffect(() => {
-    const loadOperations = async () => {
-      try {
-        const ops = await getActiveOperations();
-        setOperations(Array.isArray(ops) ? ops : []);
-      } catch (error) {
-        logger.error('Error loading operations:', error);
-        setOperations([]);
-      }
-    };
-    loadOperations();
-  }, []);
-
-  // Subscribe to data store changes
-  useEffect(() => {
-    const unsubscribe = dataStore.subscribe(async () => {
-      try {
-        const ops = await getActiveOperations();
-        setOperations(Array.isArray(ops) ? ops : []);
-      } catch (error) {
-        logger.error('Error loading operations:', error);
-      }
-    });
-    return unsubscribe;
-  }, []);
+  const activeOperations = useMemo(() =>
+    (Array.isArray(propsOperations) ? propsOperations : []).filter(op => op.archived !== true),
+    [propsOperations]
+  );
+  const operations = activeOperations;
 
   const handleArchiveOperation = async (operationId: string) => {
     if (!user) {
@@ -148,9 +127,7 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
     setArchivingId(operationId);
     try {
       await archiveOperation(operationId, user.name || user.email || 'System');
-      // Force refresh operations
-      const ops = await getActiveOperations();
-      setOperations(Array.isArray(ops) ? ops : []);
+      // App se actualiza vía dataStore.subscribe y vuelve a pasar operations por props
     } catch (error: any) {
       logger.error('Error archiving operation:', error);
       alert(`Error al archivar la operación: ${error.message || 'Por favor, intente nuevamente.'}`);
@@ -175,9 +152,7 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
     setDeletingId(operationId);
     try {
       await deleteOperation(operationId);
-      // Force refresh operations
-      const ops = await getActiveOperations();
-      setOperations(Array.isArray(ops) ? ops : []);
+      // App se actualiza vía dataStore.subscribe y vuelve a pasar operations por props
     } catch (error: any) {
       logger.error('Error deleting operation:', error);
       alert(`Error al eliminar la operación: ${error.message || 'Por favor, intente nuevamente.'}`);
@@ -206,7 +181,8 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
       })
     : [];
 
-  const selectedClient = selectedClientId ? DEMO_CLIENTS.find(c => c.id === selectedClientId) : null;
+  const clients = Array.isArray(propsClients) ? propsClients : [];
+  const selectedClient = selectedClientId ? clients.find(c => c.id === selectedClientId) : null;
 
   // Show clients list if no client selected
   if (!selectedClientId) {
@@ -220,7 +196,7 @@ const OperationsListPage: React.FC<Props> = ({ onNavigateToOperation, selectedCl
 
         {/* Clients Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {DEMO_CLIENTS.map(client => {
+          {clients.map(client => {
             // Get operations for this client from loaded operations
             const safeOps = Array.isArray(operations) ? operations : [];
             const clientOperations = safeOps.filter(op => op.clientId === client.id);

@@ -35,8 +35,8 @@ Ve a tu servicio → "Variables" y agrega las siguientes:
 # JWT Secret (genera uno seguro)
 JWT_SECRET=tu-secret-key-super-segura-aqui
 
-# CORS - URLs permitidas (separadas por comas)
-CORS_ORIGIN=https://marcosrl94.github.io,https://tu-dominio.com
+# CORS - URL del frontend en Vercel (separadas por comas si añades más orígenes)
+CORS_ORIGIN=https://dnsh-evaluator.vercel.app
 
 # Google OAuth
 GOOGLE_CLIENT_ID=169907416354-f7a2tcrkhtq4pbel40tc2ho6c84npkd2.apps.googleusercontent.com

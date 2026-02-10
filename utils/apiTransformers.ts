@@ -28,7 +28,7 @@ export function transformApiOperation(op: any): Operation {
     riskAdjustment: parseOptionalFloat(op.risk_adjustment, op.riskAdjustment),
     status: (op.status || 'Draft') as 'Draft' | 'Review' | 'Compliant' | 'Non-Compliant',
     substantialContributionId: op.substantial_contribution_id || op.substantialContributionId,
-    assets: Array.isArray(op.assets) ? op.assets : [],
+    assets: Array.isArray(op.assets) ? op.assets.map((a: any) => transformApiAsset(a)) : [],
     evidenceDocuments: Array.isArray(op.evidenceDocuments) 
       ? op.evidenceDocuments 
       : (Array.isArray(op.evidence_documents) ? op.evidence_documents : []),

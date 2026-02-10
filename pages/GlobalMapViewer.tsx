@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import MapViewer, { ActiveLayer } from '../components/MapViewer';
-import { DEMO_OPERATIONS, DEMO_CLIENTS, EU_TAXONOMY_HAZARDS } from '../constants';
+import { EU_TAXONOMY_HAZARDS } from '../constants';
 import { 
   Layers, MapPin, Search, Filter, Activity, TrendingUp, Maximize2, 
   Crosshair, ChevronDown, AlertTriangle, Zap, Building, Truck, Thermometer, Wind, ChevronLeft, ChevronRight, X, Building2, Users, ShieldCheck, CheckCircle2, XCircle, Clock, ArrowRight, Briefcase
@@ -14,16 +14,25 @@ import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 
 interface GlobalMapViewerPageProps {
+  operations?: Operation[];
+  clients?: Client[];
   onNavigateToOperation?: (operationId: string) => void;
   onNavigateToAssetEvaluation?: (assetId: string) => void;
   onNavigateToDnshEvaluation?: (operationId: string, objective?: DnshObjective) => void;
 }
 
+const operationsDefault: Operation[] = [];
+const clientsDefault: Client[] = [];
+
 const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
+  operations = operationsDefault,
+  clients = clientsDefault,
   onNavigateToOperation,
   onNavigateToAssetEvaluation,
   onNavigateToDnshEvaluation
 }) => {
+  const ops = Array.isArray(operations) ? operations : [];
+  const cl = Array.isArray(clients) ? clients : [];
   const { theme } = useTheme();
   const themeClasses = getThemeClasses(theme);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -45,14 +54,14 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
   // Filter assets based on selected client/operation and DNSH filters
   const allAssets = useMemo(() => {
     try {
-      if (!DEMO_OPERATIONS || !Array.isArray(DEMO_OPERATIONS)) {
+      if (!ops.length) {
         return [];
       }
       
-      let operationsToShow: Operation[] = DEMO_OPERATIONS;
+      let operationsToShow: Operation[] = ops;
       
       if (selectedClientId) {
-        operationsToShow = DEMO_OPERATIONS.filter(op => op.clientId === selectedClientId);
+        operationsToShow = ops.filter(op => op.clientId === selectedClientId);
       }
       
       if (selectedOperationId) {
@@ -90,14 +99,14 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
       logger.error('Error loading assets:', error);
       return [];
     }
-  }, [selectedClientId, selectedOperationId, dnshFilterObjective, dnshFilterStatus]);
+  }, [ops, selectedClientId, selectedOperationId, dnshFilterObjective, dnshFilterStatus]);
   
   const selectedAsset = allAssets.find(a => a.id === selectedAssetId);
-  const selectedClient = selectedClientId ? DEMO_CLIENTS.find(c => c.id === selectedClientId) : null;
+  const selectedClient = selectedClientId ? cl.find(c => c.id === selectedClientId) : null;
   const selectedOperation = selectedOperationId 
-    ? DEMO_OPERATIONS.find(op => op.id === selectedOperationId)
+    ? ops.find(op => op.id === selectedOperationId)
     : selectedAsset 
-      ? DEMO_OPERATIONS.find(op => op.assets.some(a => a.id === selectedAssetId))
+      ? ops.find(op => op.assets.some(a => a.id === selectedAssetId))
       : null;
   
   // Get DNSH status for selected asset
@@ -140,7 +149,7 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
     }
   };
 
-  // Mock Active Hazards for "Layers" tab
+  // Capas de peligros activas (pestaña Layers)
   const [activeHazards, setActiveHazards] = useState<Record<string, number>>({});
 
   const toggleHazard = (id: string) => {
@@ -165,7 +174,7 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
   const SidebarItem = ({ asset }: { asset: Asset }) => {
     const dnshStatus = getAssetDnshStatus(asset);
     const statusColor = getAssetDnshStatusColor(dnshStatus);
-    const assetOperation = DEMO_OPERATIONS.find(op => op.assets.some(a => a.id === asset.id));
+    const assetOperation = ops.find(op => op.assets.some(a => a.id === asset.id));
     
     return (
       <button 
@@ -322,7 +331,7 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
                          className="w-full bg-slate-800 border border-slate-700 text-sm text-white rounded-lg px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500"
                      >
                          <option value="">Todos los Clientes</option>
-                         {DEMO_CLIENTS.map(client => (
+                         {cl.map(client => (
                              <option key={client.id} value={client.id}>{client.name}</option>
                          ))}
                      </select>
@@ -338,7 +347,7 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
                              className="w-full bg-slate-800 border border-slate-700 text-sm text-white rounded-lg px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500"
                          >
                              <option value="">Todas las Operaciones</option>
-                             {DEMO_OPERATIONS
+                             {ops
                                  .filter(op => op.clientId === selectedClientId)
                                  .map(op => (
                                      <option key={op.id} value={op.id}>{op.name}</option>
@@ -435,8 +444,8 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
              <div className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">
                  {allAssets.length > 0 ? (
                      allAssets.map(asset => {
-                         const assetOperation = DEMO_OPERATIONS.find(op => op.assets.some(a => a.id === asset.id));
-                         const assetClient = assetOperation ? DEMO_CLIENTS.find(c => c.id === assetOperation.clientId) : null;
+                         const assetOperation = ops.find(op => op.assets.some(a => a.id === asset.id));
+                         const assetClient = assetOperation ? cl.find(c => c.id === assetOperation.clientId) : null;
                          
                          return (
                              <div key={asset.id}>
@@ -554,7 +563,7 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
                                 </div>
                             </div>
 
-                            {/* Risk Projection Graph Mock */}
+                            {/* Proyección de riesgo climático */}
                             <div>
                                 <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center">
                                     <TrendingUp size={14} className="mr-2 text-blue-500" />
@@ -799,16 +808,16 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   const { theme } = useTheme();
   const themeClasses = getThemeClasses(theme);
   
-  const clickedAsset = DEMO_OPERATIONS
+  const clickedAsset = ops
     .flatMap(op => op.assets)
     .find(a => a.id === assetId);
   
   const clickedOperation = clickedAsset 
-    ? DEMO_OPERATIONS.find(op => op.assets.some(a => a.id === assetId))
+    ? ops.find(op => op.assets.some(a => a.id === assetId))
     : null;
   
   const clickedClient = clickedOperation 
-    ? DEMO_CLIENTS.find(c => c.id === clickedOperation.clientId)
+    ? cl.find(c => c.id === clickedOperation.clientId)
     : null;
 
   // Determine granularity level based on current filters and clicked asset
@@ -830,7 +839,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
     if (granularityLevel === 'operation') {
       // Use selected operation if available, otherwise use clicked asset's operation
       const operation = selectedOperationId 
-        ? DEMO_OPERATIONS.find(op => op.id === selectedOperationId)
+        ? ops.find(op => op.id === selectedOperationId)
         : clickedOperation;
       
       if (!operation) {
@@ -858,13 +867,13 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           complianceRate: assets.length > 0 ? Math.round((compliantCount / assets.length) * 100) : 0,
         },
         operation: operation,
-        client: DEMO_CLIENTS.find(c => c.id === operation.clientId) || null,
+        client: cl.find(c => c.id === operation.clientId) || null,
       };
     }
     // If client is selected, show client-level aggregation
     else if (granularityLevel === 'client') {
       const client = selectedClientId 
-        ? DEMO_CLIENTS.find(c => c.id === selectedClientId)
+        ? cl.find(c => c.id === selectedClientId)
         : clickedClient;
       
       if (!client) {
@@ -876,7 +885,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
         };
       }
       
-      const clientOperations = DEMO_OPERATIONS.filter(op => op.clientId === client.id);
+      const clientOperations = ops.filter(op => op.clientId === client.id);
       const clientAssets = clientOperations.flatMap(op => op.assets);
       const totalValue = clientAssets.reduce((sum, a) => sum + a.exposedValue, 0);
       const statuses = clientAssets.map(a => a.dnshEvaluation?.overallStatus || 'Not Assessed');
@@ -919,18 +928,18 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
     // General/Portfolio level - show portfolio overview
     else {
       // General level - show portfolio overview
-      const allAssets = DEMO_OPERATIONS.flatMap(op => op.assets);
+      const allAssets = ops.flatMap(op => op.assets);
       const totalValue = allAssets.reduce((sum, a) => sum + a.exposedValue, 0);
       const statuses = allAssets.map(a => a.dnshEvaluation?.overallStatus || 'Not Assessed');
       const compliantCount = statuses.filter(s => s === 'Compliant').length;
       
       return {
         title: 'PORTFOLIO_OVERVIEW',
-        subtitle: `${DEMO_OPERATIONS.length} OPERATIONS • ${allAssets.length} ASSETS`,
+        subtitle: `${ops.length} OPERATIONS • ${allAssets.length} ASSETS`,
         level: 'PORTFOLIO',
         metrics: {
           totalValue,
-          operationCount: DEMO_OPERATIONS.length,
+          operationCount: ops.length,
           assetCount: allAssets.length,
           compliantAssets: compliantCount,
           complianceRate: allAssets.length > 0 ? Math.round((compliantCount / allAssets.length) * 100) : 0,

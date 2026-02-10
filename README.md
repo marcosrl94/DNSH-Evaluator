@@ -2,11 +2,11 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# EcoInvest DNSH Evaluator
 
-This contains everything you need to run your app locally.
+Herramienta de evaluación DNSH (Do No Significant Harm) para operaciones y activos.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1IRX1ogGWutffnzbskpe391_Z7JAth7zu
+**Producción:** [https://dnsh-evaluator.vercel.app/](https://dnsh-evaluator.vercel.app/)
 
 ## Run Locally
 
@@ -33,7 +33,7 @@ La aplicación soporta login con Google (Gmail) para acceso rápido y seguro.
 1. Ve a [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Crea un proyecto y habilita Google Identity Services API
 3. Crea credenciales OAuth 2.0 (tipo: Aplicación web)
-4. Añade orígenes autorizados: `http://localhost:3000` (desarrollo)
+4. Añade orígenes autorizados: `http://localhost:3000` (desarrollo) y `https://dnsh-evaluator.vercel.app` (producción)
 5. Copia el Client ID y añádelo a `.env` como `VITE_GOOGLE_CLIENT_ID`
 6. Reinicia el servidor
 

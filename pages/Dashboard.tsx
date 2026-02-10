@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Briefcase, TrendingUp, AlertTriangle, Clock, ArrowRight, ShieldCheck, Droplets, Leaf, RefreshCw, XCircle, Zap, FileText, MapPin, CheckCircle2, AlertCircle, Building2, DollarSign, Percent, BarChart3, TrendingDown, Activity, Search, Filter, ChevronRight, ChevronLeft, Layers, Grid, Table } from 'lucide-react';
-import { DEMO_OPERATIONS, DEMO_CLIENTS } from '../constants';
 import { Operation, DnshObjective, Client, RiskBand, Asset } from '../types';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
 import { canDisplayDnshStatus, getSafeDnshStatus } from '../services/dnshValidation';
@@ -8,7 +7,6 @@ import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 import { JourneyMetrics } from '../components/JourneyMetrics';
 import { calculateJourneyProgress } from '../services/journeyService';
-import { getAllOperations } from '../services/dataManagement';
 import { logger } from '../utils/logger';
 import { getAssetObjectiveStatus } from '../services/dnshEvaluationService';
 import MapViewer from '../components/MapViewer';
@@ -16,6 +14,7 @@ import { OnlineUsersIndicator } from '../components/OnlineUsersIndicator';
 
 interface DashboardProps {
   operations?: Operation[];
+  clients?: Client[];
   onNavigateToOperation: (id: string) => void;
   onNavigateToOperationsList?: () => void;
   onNavigateToClient?: (clientId: string) => void;
@@ -63,7 +62,8 @@ interface AssetStatus {
 }
 
 const DashboardPage: React.FC<DashboardProps> = ({ 
-  operations: propsOperations,
+  operations: propsOperations = [],
+  clients: propsClients = [],
   onNavigateToOperation, 
   onNavigateToOperationsList,
   onNavigateToClient,
@@ -72,35 +72,20 @@ const DashboardPage: React.FC<DashboardProps> = ({
 }) => {
   const { theme } = useTheme();
   const themeClasses = getThemeClasses(theme);
-  const [operations, setOperations] = useState<Operation[]>(propsOperations || DEMO_OPERATIONS);
+  const operations = Array.isArray(propsOperations) ? propsOperations : [];
+  const clients = Array.isArray(propsClients) ? propsClients : [];
   const [viewLevel, setViewLevel] = useState<ViewLevel>('client');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Compliant' | 'Non-Compliant' | 'Conditional' | 'Not Assessed' | 'Asymmetric'>('All');
-  
-  // Load operations if not provided
-  useEffect(() => {
-    if (!propsOperations) {
-      const loadOperations = async () => {
-        try {
-          const ops = await getAllOperations();
-          setOperations(Array.isArray(ops) ? ops : DEMO_OPERATIONS);
-        } catch (error) {
-          logger.error('Error loading operations:', error);
-          setOperations(DEMO_OPERATIONS);
-        }
-      };
-      loadOperations();
-    }
-  }, [propsOperations]);
 
   // Calculate Client-level statuses
   const clientStatuses = useMemo<ClientStatus[]>(() => {
     const clientMap = new Map<string, ClientStatus>();
 
-    DEMO_CLIENTS.forEach(client => {
+    clients.forEach(client => {
       const clientOps = operations.filter(op => op.clientId === client.id);
       if (clientOps.length === 0) return;
 
@@ -182,7 +167,7 @@ const DashboardPage: React.FC<DashboardProps> = ({
     });
 
     return Array.from(clientMap.values());
-  }, [operations]);
+  }, [operations, clients]);
 
   // Calculate Portfolio-level statuses
   const portfolioStatuses = useMemo<PortfolioStatus[]>(() => {
@@ -430,14 +415,14 @@ const DashboardPage: React.FC<DashboardProps> = ({
             {viewLevel === 'client' && <span>NIVEL_CLIENTE</span>}
             {viewLevel === 'portfolio' && selectedClientId && (
               <>
-                <span>{DEMO_CLIENTS.find(c => c.id === selectedClientId)?.name}</span>
+                <span>{clients.find(c => c.id === selectedClientId)?.name}</span>
                 <ChevronRight size={12} />
                 <span>NIVEL_PORTFOLIO</span>
               </>
             )}
             {viewLevel === 'asset' && selectedOperationId && (
               <>
-                <span>{DEMO_CLIENTS.find(c => c.id === selectedClientId)?.name}</span>
+                <span>{clients.find(c => c.id === selectedClientId)?.name}</span>
                 <ChevronRight size={12} />
                 <span>{operations.find(op => op.id === selectedOperationId)?.name}</span>
                 <ChevronRight size={12} />
