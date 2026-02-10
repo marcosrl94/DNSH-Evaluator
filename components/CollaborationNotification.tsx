@@ -26,7 +26,7 @@ export const CollaborationNotification: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
-    const socket = (socketService as any).socket;
+    const socket = socketService.getSocket();
     if (!socket || !socket.connected) {
       return;
     }

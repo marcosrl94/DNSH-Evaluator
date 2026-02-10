@@ -120,12 +120,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               permissions: storedUser.permissions || getPermissionsForRole(currentUser.user.role)
             };
             
-            setUser(mergedUser);
             apiClient.setToken(storedToken);
-            // Connect Socket.IO in background, don't wait
-            socketService.connect(storedToken).catch((err) => {
+            // Conectar Socket.IO antes de setUser para que OnlineUsersContext tenga socket listo
+            await socketService.connect(storedToken).catch((err) => {
               logger.warn('Socket.IO connection failed (non-critical):', err);
             });
+            setUser(mergedUser);
           } catch (error) {
             // Token invalid, clear storage
             logger.error('Token validation failed:', error);
@@ -204,8 +204,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           storeRefreshToken(response.refreshToken);
         }
 
-        // Connect Socket.IO (don't wait, let it connect in background)
-        socketService.connect(response.token).catch((err) => {
+        // Conectar Socket.IO antes de setUser para info en tiempo real
+        await socketService.connect(response.token).catch((err) => {
           logger.warn('Socket.IO connection failed (non-critical):', err);
         });
 
@@ -282,8 +282,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             storeRefreshToken(result.refreshToken);
           }
 
-          // Connect Socket.IO (don't wait, let it connect in background)
-          socketService.connect(result.token).catch((err) => {
+          // Conectar Socket.IO antes de setUser para info en tiempo real
+          await socketService.connect(result.token).catch((err) => {
             logger.warn('Socket.IO connection failed (non-critical):', err);
           });
 
@@ -409,8 +409,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           storeRefreshToken(response.refreshToken);
         }
 
-        // Connect Socket.IO (don't wait, let it connect in background)
-        socketService.connect(response.token).catch((err) => {
+        // Conectar Socket.IO antes de setUser para info en tiempo real
+        await socketService.connect(response.token).catch((err) => {
           logger.warn('Socket.IO connection failed (non-critical):', err);
         });
 

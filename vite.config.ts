@@ -54,11 +54,7 @@ export default defineConfig(({ mode }) => {
             },
           },
           external: (id) => {
-            // Externalize socket.io-client to avoid build errors if not installed
-            if (id === 'socket.io-client' || id.includes('socket.io-client')) {
-              return true;
-            }
-            // Don't externalize @google/generative-ai - let it be bundled
+            // Don't externalize - socket.io-client está instalado y se incluye en el bundle
             return false;
           }
         },
@@ -73,8 +69,8 @@ export default defineConfig(({ mode }) => {
       },
       // Optimize dependencies
       optimizeDeps: {
-        include: ['react', 'react-dom', 'leaflet', 'react-leaflet'],
-        exclude: ['socket.io-client', '@google/generative-ai'], // Don't optimize optional dependency
+        include: ['react', 'react-dom', 'leaflet', 'react-leaflet', 'socket.io-client'],
+        exclude: ['@google/generative-ai'],
       },
     };
 });

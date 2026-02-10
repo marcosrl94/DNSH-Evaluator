@@ -41,7 +41,7 @@ import { rateLimiter } from './middleware/rateLimiter';
 import { initDatabase } from './config/database';
 
 // Import socket handlers
-import { setupSocketIO } from './config/socketio';
+import { setupSocketIO, setIO } from './config/socketio';
 
 // Import Swagger
 import { setupSwagger } from './config/swagger';
@@ -74,6 +74,7 @@ const io = new Server(httpServer, {
 });
 
 // Setup Socket.IO handlers
+setIO(io); // Para emitToOperation, emitToAsset, etc. en las rutas
 setupSocketIO(io);
 ioInstance = io;
 

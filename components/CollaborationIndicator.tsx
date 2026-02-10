@@ -35,7 +35,7 @@ export const CollaborationIndicator: React.FC<CollaborationIndicatorProps> = ({
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    const socket = (socketService as any).socket;
+    const socket = socketService.getSocket();
     if (!socket || !socket.connected) {
       return;
     }
@@ -105,12 +105,12 @@ export const CollaborationIndicator: React.FC<CollaborationIndicatorProps> = ({
 
     if (isEditing) {
       socketService.joinAsset(assetId);
-      (socketService as any).socket?.emit('editing:start', {
+      socketService.getSocket()?.emit('editing:start', {
         assetId,
         field
       });
     } else {
-      (socketService as any).socket?.emit('editing:stop', {
+      socketService.getSocket()?.emit('editing:stop', {
         assetId,
         field
       });
@@ -181,14 +181,14 @@ export const useCollaborationEditing = (assetId: string, field: string) => {
 
     if (isEditing) {
       socketService.joinAsset(assetId);
-      (socketService as any).socket?.emit('editing:start', { assetId, field });
+      socketService.getSocket()?.emit('editing:start', { assetId, field });
     } else {
-      (socketService as any).socket?.emit('editing:stop', { assetId, field });
+      socketService.getSocket()?.emit('editing:stop', { assetId, field });
     }
 
     return () => {
       if (isEditing) {
-        (socketService as any).socket?.emit('editing:stop', { assetId, field });
+        socketService.getSocket()?.emit('editing:stop', { assetId, field });
       }
     };
   }, [isEditing, assetId, field]);

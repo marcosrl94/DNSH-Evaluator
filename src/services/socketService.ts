@@ -1,76 +1,41 @@
 /**
  * Socket.IO Service
  * Real-time collaboration and notifications
- * Optional - gracefully handles missing socket.io-client
- * Uses global window object to avoid build-time imports
  */
 
+import { io } from 'socket.io-client';
 import { logger } from '../../utils/logger';
 
 const envSocketUrl = (import.meta.env.VITE_SOCKET_URL || '').trim();
-const isProd = import.meta.env.PROD;
 const RAILWAY_SOCKET = 'https://dnsh-evaluator-production.up.railway.app';
 
 function getSocketUrl(): string {
   let url = envSocketUrl?.trim() || RAILWAY_SOCKET;
-  if (typeof window !== 'undefined' && isProd && window.location.origin.includes('vercel.app')) {
-    return RAILWAY_SOCKET;
-  }
-  if (typeof window !== 'undefined' && isProd) {
-    const origin = window.location.origin.replace(/\/$/, '');
-    const normalized = url.replace(/\/$/, '');
-    if (normalized === origin || normalized.startsWith(origin + '/')) return RAILWAY_SOCKET;
+  if (typeof window !== 'undefined') {
+    const origin = (window.location?.origin || '').replace(/\/$/, '');
+    // En Vercel: siempre usar Railway
+    if (origin.includes('vercel.app')) return RAILWAY_SOCKET;
+    if (url === origin || url.startsWith(origin + '/')) return RAILWAY_SOCKET;
   }
   return url.replace(/\/$/, '');
 }
 
-const SOCKET_URL = getSocketUrl();
-
-// Declare global Socket.IO types
-declare global {
-  interface Window {
-    io?: any;
-    socketIOClient?: any;
-  }
-}
-
 class SocketService {
-  private socket: any = null;
+  private socket: ReturnType<typeof io> | null = null;
   private token: string | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
-  private ioLoader: Promise<any> | null = null;
 
-  private async loadSocketIO(): Promise<any> {
-    if (this.ioLoader) {
-      return this.ioLoader;
+  /** Conectar si usamos API (vercel.app siempre, o cuando hay VITE_USE_API/VITE_API_URL) */
+  private shouldConnect(): boolean {
+    if (typeof window !== 'undefined' && window.location?.origin?.includes('vercel.app')) {
+      return true;
     }
-
-    // Only try to load if USE_API is enabled
-    const USE_API = import.meta.env.VITE_USE_API === 'true' || import.meta.env.VITE_API_URL;
-    if (!USE_API) {
-      return null;
-    }
-
-    this.ioLoader = new Promise(async (resolve) => {
-      try {
-        // Try to load socket.io-client dynamically
-        // Use eval to avoid static analysis by bundler
-        const loadModule = new Function('return import("socket.io-client")');
-        const module = await loadModule();
-        resolve(module);
-      } catch (error) {
-        logger.warn('socket.io-client not available, Socket.IO features disabled');
-        resolve(null);
-      }
-    });
-
-    return this.ioLoader;
+    return import.meta.env.VITE_USE_API === 'true' || !!import.meta.env.VITE_API_URL;
   }
 
   async connect(token: string) {
-    const ioModule = await this.loadSocketIO();
-    if (!ioModule || !ioModule.io) {
-      logger.warn('Socket.IO client not available');
+    if (!this.shouldConnect()) {
+      logger.info('Socket.IO skipped (API mode disabled)');
       return;
     }
 
@@ -79,7 +44,8 @@ class SocketService {
     }
 
     this.token = token;
-    this.socket = ioModule.io(SOCKET_URL, {
+    const socketUrl = getSocketUrl();
+    this.socket = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -292,6 +258,11 @@ class SocketService {
 
   isConnected(): boolean {
     return this.socket?.connected || false;
+  }
+
+  /** Socket interno (para OnlineUsersContext, etc.) */
+  getSocket() {
+    return this.socket;
   }
 }
 

@@ -53,7 +53,7 @@ export const CollaborationIndicatorEnhanced: React.FC<CollaborationIndicatorEnha
   }, [onlineUsers, assetId, operationId]);
 
   useEffect(() => {
-    const socket = (socketService as any).socket;
+    const socket = socketService.getSocket();
     if (!socket || !socket.connected) {
       return;
     }
@@ -130,13 +130,13 @@ export const CollaborationIndicatorEnhanced: React.FC<CollaborationIndicatorEnha
       if (operationId) {
         socketService.joinOperation(operationId);
       }
-      (socketService as any).socket?.emit('editing:start', {
+      socketService.getSocket()?.emit('editing:start', {
         assetId,
         operationId,
         field
       });
     } else {
-      (socketService as any).socket?.emit('editing:stop', {
+      socketService.getSocket()?.emit('editing:stop', {
         assetId,
         operationId,
         field
@@ -238,14 +238,14 @@ export const useCollaborationEditing = (assetId?: string, operationId?: string, 
       if (operationId) {
         socketService.joinOperation(operationId);
       }
-      (socketService as any).socket?.emit('editing:start', { assetId, operationId, field });
+      socketService.getSocket()?.emit('editing:start', { assetId, operationId, field });
     } else {
-      (socketService as any).socket?.emit('editing:stop', { assetId, operationId, field });
+      socketService.getSocket()?.emit('editing:stop', { assetId, operationId, field });
     }
 
     return () => {
       if (isEditing) {
-        (socketService as any).socket?.emit('editing:stop', { assetId, operationId, field });
+        socketService.getSocket()?.emit('editing:stop', { assetId, operationId, field });
       }
     };
   }, [isEditing, assetId, operationId, field]);

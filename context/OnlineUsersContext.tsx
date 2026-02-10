@@ -41,9 +41,10 @@ export const OnlineUsersProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
 
   useEffect(() => {
-    if (!user || !socketService.isConnected()) {
-      return;
-    }
+    if (!user) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
 
     // Listen for user presence updates
     const handleUserOnline = async (data: { userId: string }) => {
@@ -116,11 +117,9 @@ export const OnlineUsersProvider: React.FC<{ children: ReactNode }> = ({ childre
     };
 
     // Set up socket listeners
-    const socket = (socketService as any).socket;
-    if (socket) {
-      socket.on('user:online', handleUserOnline);
-      socket.on('user:offline', handleUserOffline);
-      socket.on('user:update', handleUserUpdate);
+    socket.on('user:online', handleUserOnline);
+    socket.on('user:offline', handleUserOffline);
+    socket.on('user:update', handleUserUpdate);
       
       // Type for users list data
       interface UsersListData {
@@ -194,18 +193,15 @@ export const OnlineUsersProvider: React.FC<{ children: ReactNode }> = ({ childre
         setOnlineUsers(usersWithDetails);
       });
 
-      // Request current online users list
-      socket.emit('users:get-list');
-    }
+    // Request current online users list
+    socket.emit('users:get-list');
 
     // Clean up on unmount
     return () => {
-      if (socket) {
-        socket.off('user:online', handleUserOnline);
-        socket.off('user:offline', handleUserOffline);
-        socket.off('user:update', handleUserUpdate);
-        socket.off('users:list');
-      }
+      socket.off('user:online', handleUserOnline);
+      socket.off('user:offline', handleUserOffline);
+      socket.off('user:update', handleUserUpdate);
+      socket.off('users:list');
     };
   }, [user]);
 
