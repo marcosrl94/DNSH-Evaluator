@@ -15,12 +15,6 @@ interface JourneyMetricsProps {
 }
 
 export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) => {
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:15',message:'JourneyMetrics render',data:{operationsType:typeof operations,operationsIsArray:Array.isArray(operations),operationsLength:Array.isArray(operations)?operations.length:'not array'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
-  
   const { theme } = useTheme();
   
   // Ensure operations is an array
@@ -40,12 +34,6 @@ export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) =>
     let blockedOperations = 0;
 
     safeOperations.forEach(operation => {
-      // #region agent log
-      try {
-        fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:35',message:'Calculating journey progress',data:{operationId:String(operation.id||''),operationIdType:typeof operation.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      } catch (e) {}
-      // #endregion
-      
       try {
         const progress = calculateJourneyProgress(operation);
         const stageStr = String(progress.stage || '');
@@ -54,27 +42,19 @@ export const JourneyMetrics: React.FC<JourneyMetricsProps> = ({ operations }) =>
         }
         const progValue = typeof progress.progress === 'number' ? progress.progress : Number(progress.progress) || 0;
         totalProgress += progValue;
-      
+
         if (progress.completed) {
           completedOperations++;
         }
-        
-        // Consider blocked if stuck in same stage for > 7 days
-        // #region agent log
-        try {
-          const lastUpdatedRaw = progress.lastUpdated;
-          fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:43',message:'Converting lastUpdated to Date',data:{lastUpdatedType:typeof lastUpdatedRaw,lastUpdatedValue:lastUpdatedRaw instanceof Date ? lastUpdatedRaw.toISOString() : String(lastUpdatedRaw),isDate:lastUpdatedRaw instanceof Date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          const lastUpdated = lastUpdatedRaw instanceof Date ? lastUpdatedRaw : new Date(String(lastUpdatedRaw));
-          const daysSinceUpdate = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
-          if (daysSinceUpdate > 7 && !progress.completed) {
-            blockedOperations++;
-          }
-        } catch (e) {
-          fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:43',message:'Error converting lastUpdated',data:{conversionError:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+
+        const lastUpdatedRaw = progress.lastUpdated;
+        const lastUpdated = lastUpdatedRaw instanceof Date ? lastUpdatedRaw : new Date(String(lastUpdatedRaw));
+        const daysSinceUpdate = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceUpdate > 7 && !progress.completed) {
+          blockedOperations++;
         }
-        // #endregion
-      } catch (e) {
-        fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyMetrics.tsx:35',message:'Error calculating progress for operation',data:{error:String(e),operationId:String(operation.id||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      } catch {
+        // Ignore errors for individual operations
       }
     });
 

@@ -389,15 +389,6 @@ const OperationDetailPage: React.FC<Props> = ({
               {/* Journey Progress */}
               <div className="mt-4">
                 {(() => {
-                  // #region agent log
-                  try {
-                    const prog = journeyProgress;
-                    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:343',message:'Rendering JourneyProgressIndicator',data:{progressType:typeof prog,progressStageType:typeof prog?.stage,progressProgressType:typeof prog?.progress,progressProgressValue:prog?.progress,progressLastUpdatedType:typeof prog?.lastUpdated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                  } catch (e) {
-                    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:343',message:'Error logging JourneyProgressIndicator',data:{error:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                  }
-                  // #endregion
-                  
                   if (!journeyProgress || typeof journeyProgress !== 'object') {
                     return null;
                   }

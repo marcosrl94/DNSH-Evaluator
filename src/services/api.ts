@@ -6,13 +6,25 @@
 
 const envApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 const isProd = import.meta.env.PROD;
-// En producción, si falta VITE_API_URL, usar la URL del backend en Railway para no hacer POST al front (405)
 const FALLBACK_PRODUCTION_API = 'https://dnsh-evaluator-production.up.railway.app/api/v1';
-const API_BASE_URL = envApiUrl
-  ? envApiUrl
-  : isProd
-    ? FALLBACK_PRODUCTION_API
-    : 'http://localhost:3001/api/v1';
+
+function getApiBaseUrl(): string {
+  let base = envApiUrl
+    ? envApiUrl
+    : FALLBACK_PRODUCTION_API;
+  // En producción en el navegador: nunca usar el mismo origen (evita 405 si VITE_API_URL apunta al front)
+  if (typeof window !== 'undefined' && isProd) {
+    const origin = window.location.origin.replace(/\/$/, '');
+    const normalized = base.replace(/\/$/, '');
+    const hasProtocol = /^https?:\/\//i.test(base);
+    if (!hasProtocol || !normalized || normalized === origin || normalized.startsWith(origin + '/')) {
+      base = FALLBACK_PRODUCTION_API;
+    }
+  }
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface ApiResponse<T> {
   data?: T;

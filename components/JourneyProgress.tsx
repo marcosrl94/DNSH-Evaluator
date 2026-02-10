@@ -19,12 +19,6 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
   showLabels = true,
   compact = false,
 }) => {
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyProgress.tsx:17',message:'JourneyProgressIndicator render',data:{progressType:typeof progress,progressStageType:typeof progress?.stage,progressProgressType:typeof progress?.progress,progressLastUpdatedType:typeof progress?.lastUpdated,progressKeys:progress?Object.keys(progress):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
-  
   const { theme } = useTheme();
   
   // Ensure progress is valid and all properties are primitives
@@ -60,12 +54,6 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
   };
 
   const getStageStatus = (stage: JourneyStage) => {
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyProgress.tsx:42',message:'getStageStatus called',data:{progressStageType:typeof safeProgress.stage,progressStageValue:String(safeProgress.stage),stageType:typeof stage,stageValue:String(stage)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    } catch (e) {}
-    // #endregion
-    
     const currentIndex = JOURNEY_STAGES.findIndex(s => s.stage === safeProgress.stage);
     const stageIndex = JOURNEY_STAGES.findIndex(s => s.stage === stage);
     
@@ -128,18 +116,7 @@ export const JourneyProgressIndicator: React.FC<JourneyProgressProps> = ({
           PROGRESO_JOURNEY
         </h3>
         <span className={`text-xs font-bold font-mono ${theme === 'dark' ? 'text-[#00ff88]' : 'text-green-600'}`}>
-          {(() => {
-            // #region agent log
-            try {
-              const prog = safeProgress.progress;
-              fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyProgress.tsx:105',message:'Rendering progress percentage',data:{progressType:typeof prog,progressValue:String(prog)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-              return `${Number(prog || 0)}%`;
-            } catch (e) {
-              fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'JourneyProgress.tsx:105',message:'Error converting progress',data:{conversionError:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-              return '0%';
-            }
-            // #endregion
-          })()}
+          {`${Number(safeProgress.progress || 0)}%`}
         </span>
       </div>
       

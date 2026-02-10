@@ -10,11 +10,23 @@ import { logger } from '../../utils/logger';
 const envSocketUrl = (import.meta.env.VITE_SOCKET_URL || '').trim();
 const isProd = import.meta.env.PROD;
 const FALLBACK_PRODUCTION_SOCKET = 'https://dnsh-evaluator-production.up.railway.app';
-const SOCKET_URL = envSocketUrl
-  ? envSocketUrl
-  : isProd
-    ? FALLBACK_PRODUCTION_SOCKET
-    : 'http://localhost:3001';
+
+function getSocketUrl(): string {
+  let url = envSocketUrl
+    ? envSocketUrl
+    : FALLBACK_PRODUCTION_SOCKET;
+  if (typeof window !== 'undefined' && isProd) {
+    const origin = window.location.origin.replace(/\/$/, '');
+    const normalized = url.replace(/\/$/, '');
+    const hasProtocol = /^https?:\/\//i.test(url);
+    if (!hasProtocol || !normalized || normalized === origin || normalized.startsWith(origin + '/')) {
+      url = FALLBACK_PRODUCTION_SOCKET;
+    }
+  }
+  return url.replace(/\/$/, '');
+}
+
+const SOCKET_URL = getSocketUrl();
 
 // Declare global Socket.IO types
 declare global {

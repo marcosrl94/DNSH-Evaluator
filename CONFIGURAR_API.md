@@ -171,6 +171,19 @@ Si algo falla, revisa CORS (`CORS_ORIGIN` debe incluir la URL del front), que la
 
 ---
 
+## Si en producción ves `net::ERR_FAILED` o "No se puede conectar al servidor"
+
+1. **Comprueba que el backend en Railway esté en marcha**  
+   Abre en el navegador: `https://dnsh-evaluator-production.up.railway.app/health`  
+   - Si responde `{"status":"ok",...}` → el backend está bien; el fallo puede ser CORS o red puntual.  
+   - Si no carga o da error → en Railway revisa que el servicio esté desplegado, que no esté dormido (plan free) y que la URL del dominio sea la correcta.
+
+2. **CORS:** En Railway, pon `NODE_ENV=production` y, si quieres, `CORS_ORIGIN=https://dnsh-evaluator.vercel.app`. En producción el backend ya permite por defecto `https://dnsh-evaluator.vercel.app` aunque no definas `CORS_ORIGIN`.
+
+3. **Redeploy del backend:** Tras cambiar variables en Railway, haz un redeploy del servicio para que las tome.
+
+---
+
 ## Resumen mínimo
 
 | Dónde   | Variable          | Ejemplo / valor                          |

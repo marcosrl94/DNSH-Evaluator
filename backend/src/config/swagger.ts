@@ -36,12 +36,8 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: `http://localhost:${process.env.PORT || 3001}`,
-        description: 'Servidor de desarrollo'
-      },
-      {
-        url: 'https://api.ecoinvest.com',
-        description: 'Servidor de producción'
+        url: process.env.API_PUBLIC_URL || 'https://dnsh-evaluator-production.up.railway.app',
+        description: 'Backend (Railway)'
       }
     ],
     components: {

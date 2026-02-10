@@ -49,6 +49,12 @@ import { setupSwagger } from './config/swagger';
 // Export io for use in routes
 export let ioInstance: Server;
 
+// CORS: Vercel (front) y Railway (back) como referencia; CORS_ORIGIN para orígenes adicionales
+const defaultCorsOrigins = ['https://dnsh-evaluator.vercel.app'];
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+  : defaultCorsOrigins;
+
 // Initialize Express app
 const app = express();
 const httpServer = createServer(app);
@@ -56,7 +62,7 @@ const httpServer = createServer(app);
 // Initialize Socket.IO
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
+    origin: corsOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -74,14 +80,14 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", process.env.CORS_ORIGIN?.split(',') || 'http://localhost:3000'].flat()
+      connectSrc: ["'self'", corsOrigins].flat()
     }
   },
   crossOriginEmbedderPolicy: false
 })); // Security headers
 app.use(compression()); // Gzip compression
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
+  origin: corsOrigins,
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -140,7 +146,7 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Helper function to check database health
+// Helper function to check database health (no lanza si la DB no está inicializada)
 async function checkDatabaseHealth(): Promise<'connected' | 'unavailable'> {
   try {
     const { getPool } = await import('./config/database');
@@ -174,35 +180,28 @@ app.use(`${API_PREFIX}/organizations`, organizationsRoutes);
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Initialize database and start server
-const PORT = process.env.PORT || 3001;
+// Initialize database and start server (Railway inyecta PORT como string)
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 async function startServer() {
-  try {
-    // Initialize database connection (non-blocking)
-    try {
-      await initDatabase();
-      console.log('✅ Database connected');
-      
-      // Run migrations automatically
-      const { runMigrations } = await import('./database/migrations');
-      await runMigrations();
-    } catch (dbError: any) {
-      console.warn('⚠️  Database connection failed:', dbError.message);
-      console.warn('⚠️  Server will start but database features will be unavailable');
-      console.warn('⚠️  To fix: Install PostgreSQL and configure DATABASE_URL in .env');
-    }
+  // Escuchar primero para que Railway marque la app como "running" de inmediato
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📡 API available at http://0.0.0.0:${PORT}${API_PREFIX}`);
+    console.log(`🔌 Socket.IO ready for real-time updates`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
 
-    // Start HTTP server
-    httpServer.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📡 API available at http://localhost:${PORT}${API_PREFIX}`);
-      console.log(`🔌 Socket.IO ready for real-time updates`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
+  // Inicializar DB y migraciones en segundo plano (no bloquean la respuesta a Railway)
+  try {
+    await initDatabase();
+    console.log('✅ Database connected');
+    const { runMigrations } = await import('./database/migrations');
+    await runMigrations();
+  } catch (dbError: any) {
+    console.warn('⚠️  Database connection failed:', dbError.message);
+    console.warn('⚠️  Server is running but database features will be unavailable');
+    console.warn('⚠️  To fix: Configure DATABASE_URL in Railway (add PostgreSQL plugin)');
   }
 }
 

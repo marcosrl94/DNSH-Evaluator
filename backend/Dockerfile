@@ -29,8 +29,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
 
-# Copiar código compilado desde builder
+# Copiar código compilado y migraciones SQL (migrations.ts lee desde ../../database/migrations)
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/database ./database
 
 # Crear usuario no-root para seguridad
 RUN addgroup -g 1001 -S nodejs && \
