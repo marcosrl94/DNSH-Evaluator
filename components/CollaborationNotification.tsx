@@ -159,20 +159,16 @@ export const CollaborationNotification: React.FC = () => {
             <p className="text-sm font-medium font-mono">{String(notification.message || '')}</p>
             <p className="text-xs opacity-75 mt-0.5">
               {(() => {
-                // #region agent log
                 try {
                   const ts = notification.timestamp;
-                  fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollaborationNotification.tsx:160',message:'Rendering notification timestamp',data:{timestampType:typeof ts,isDate:ts instanceof Date,timestampValue:ts instanceof Date ? ts.toISOString() : String(ts)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                   if (ts instanceof Date) {
                     return ts.toLocaleTimeString();
                   }
                   const date = new Date(String(ts));
                   return isNaN(date.getTime()) ? '' : date.toLocaleTimeString();
                 } catch (e) {
-                  fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CollaborationNotification.tsx:160',message:'Error converting notification timestamp',data:{conversionError:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                   return '';
                 }
-                // #endregion
               })()}
             </p>
           </div>

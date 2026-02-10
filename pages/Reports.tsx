@@ -7,9 +7,12 @@ import MapViewer from '../components/MapViewer';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
 import { generateCompanyReport, generatePortfolioReport, generateAssetReport, ReportLevel, ReportSection } from '../services/reportingService';
 import { generateReportSectionWithAI } from '../services/aiIntegrationService';
+import { buildDetailedDNSHContext, applyCustomPrompts, getDefaultPromptForSection } from '../services/reportPromptService';
+import SectionPromptManager from '../components/SectionPromptManager';
 import ReportingAIAssistant from '../components/ReportingAIAssistant';
 import ReportConfigPanel from '../components/ReportConfigPanel';
 import AIProviderSelector from '../components/AIProviderSelector';
+import { OnlineUsersIndicator } from '../components/OnlineUsersIndicator';
 import { getDefaultConfiguration, getEnabledSections, ReportConfiguration } from '../services/reportConfig';
 import { AIProvider } from '../services/aiProviderService';
 import { logger } from '../utils/logger';
@@ -221,6 +224,9 @@ const ReportsPage: React.FC = () => {
     
     setIsGeneratingWithAI(true);
     try {
+      // Build detailed DNSH context
+      const detailedDnshData = buildDetailedDNSHContext(selectedOperation || undefined, selectedAsset || undefined);
+      
       const context = {
         client: selectedClient || undefined,
         operation: selectedOperation || undefined,
@@ -228,8 +234,13 @@ const ReportsPage: React.FC = () => {
         operations: reportLevel === ReportLevel.COMPANY && Array.isArray(operations) ? operations.filter(op => op && op.clientId === selectedClientId) : undefined,
         metrics: companyReport?.metrics || portfolioReport?.metrics || assetReport?.metrics,
         objectiveCompliance: companyReport?.metrics?.objectiveCompliance || portfolioReport?.metrics?.objectiveCompliance,
-        riskDistribution: companyReport?.metrics?.riskDistribution
+        riskDistribution: companyReport?.metrics?.riskDistribution,
+        detailedDnshData
       };
+      
+      // Get default prompt and apply custom prompts if any
+      const defaultPrompt = getDefaultPromptForSection(section.type, context);
+      const finalPrompt = applyCustomPrompts(defaultPrompt, section.customPrompts);
       
       // Convert ReportSectionType enum to string for AI service
       const sectionTypeString = section.type.toString().toLowerCase();
@@ -237,9 +248,24 @@ const ReportsPage: React.FC = () => {
       const enhancedContent = await generateReportSectionWithAI(
         selectedAIProvider,
         sectionTypeString,
-        context,
+        {
+          ...context,
+          customPrompt: finalPrompt
+        },
         section.content
       );
+      
+      // Mark section as linked to DNSH data
+      const updatedSection = {
+        ...section,
+        content: enhancedContent,
+        metadata: {
+          ...section.metadata,
+          lastModified: new Date().toISOString(),
+          aiGenerated: true,
+          dnshDataLinked: true
+        }
+      };
       
       handleSectionUpdate(sectionId, enhancedContent);
     } catch (error: any) {
@@ -256,29 +282,54 @@ const ReportsPage: React.FC = () => {
     setIsGeneratingWithAI(true);
     try {
       const safeOperations = Array.isArray(operations) ? operations : [];
-      const context = {
+      
+      // Build detailed DNSH context
+      const detailedDnshData = buildDetailedDNSHContext(selectedOperation || undefined, selectedAsset || undefined);
+      
+      const baseContext = {
         client: selectedClient || undefined,
         operation: selectedOperation || undefined,
         asset: selectedAsset || undefined,
         operations: reportLevel === ReportLevel.COMPANY ? safeOperations.filter(op => op && op.clientId === selectedClientId) : undefined,
         metrics: companyReport?.metrics || portfolioReport?.metrics || assetReport?.metrics,
         objectiveCompliance: companyReport?.metrics?.objectiveCompliance || portfolioReport?.metrics?.objectiveCompliance,
-        riskDistribution: companyReport?.metrics?.riskDistribution
+        riskDistribution: companyReport?.metrics?.riskDistribution,
+        detailedDnshData
       };
       
       // Regenerate all enabled sections
       for (const section of filteredReportSections) {
         if (!section || !section.id || !section.type) continue;
         try {
+          // Get default prompt and apply custom prompts if any
+          const defaultPrompt = getDefaultPromptForSection(section.type, baseContext);
+          const finalPrompt = applyCustomPrompts(defaultPrompt, section.customPrompts);
+          
           // Convert ReportSectionType enum to string for AI service
           const sectionTypeString = section.type.toString().toLowerCase();
           
           const enhancedContent = await generateReportSectionWithAI(
             selectedAIProvider,
             sectionTypeString,
-            context,
+            {
+              ...baseContext,
+              customPrompt: finalPrompt
+            },
             section.content
           );
+          
+          // Update section with DNSH data linked flag
+          const updatedSection = {
+            ...section,
+            content: enhancedContent,
+            metadata: {
+              ...section.metadata,
+              lastModified: new Date().toISOString(),
+              aiGenerated: true,
+              dnshDataLinked: true
+            }
+          };
+          
           handleSectionUpdate(section.id, enhancedContent);
           // Small delay to avoid rate limits
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -291,6 +342,17 @@ const ReportsPage: React.FC = () => {
       alert(`Error al generar reporte con IA: ${error.message}`);
     } finally {
       setIsGeneratingWithAI(false);
+    }
+  };
+  
+  const handleSectionPromptUpdate = (sectionId: string, updatedSection: ReportSection) => {
+    handleSectionUpdate(sectionId, updatedSection.content);
+    // Also update the section's custom prompts
+    if (currentReport) {
+      const sectionIndex = currentReport.sections.findIndex(s => s.id === sectionId);
+      if (sectionIndex !== -1) {
+        currentReport.sections[sectionIndex] = updatedSection;
+      }
     }
   };
   
@@ -698,6 +760,14 @@ const ReportsPage: React.FC = () => {
           )}
         </div>
         <div className="flex items-center space-x-2 md:space-x-3 flex-wrap">
+          {/* Online Users Indicator */}
+          <OnlineUsersIndicator 
+            operationId={selectedOpId || undefined}
+            assetId={selectedAssetId || undefined}
+            maxVisible={4}
+            position="header"
+          />
+          
           {/* Theme Toggle */}
           <button
             type="button"
@@ -878,6 +948,17 @@ const ReportsPage: React.FC = () => {
                       {/* Section Content */}
                       {isExpanded && (
                         <div className={`p-6 transition-colors ${themeClasses.bg.card}`}>
+                          {/* Prompt Manager */}
+                          {selectedAIProvider && (
+                            <div className="mb-4">
+                              <SectionPromptManager
+                                section={section}
+                                onSectionUpdate={(updatedSection) => handleSectionPromptUpdate(section.id, updatedSection)}
+                                theme={theme}
+                              />
+                            </div>
+                          )}
+                          
                           {editingSectionId === section.id ? (
                             <div className="space-y-4">
                               <textarea

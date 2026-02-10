@@ -64,11 +64,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="px-8 py-4">
         {/* Right Side Actions */}
         <div className="absolute top-4 right-4 flex items-center space-x-3">
-          {/* Online Users Indicator */}
+          {/* Online Users Indicator - NFQ Foundry Style */}
           <OnlineUsersIndicator 
             operationId={selectedOperation?.id ? String(selectedOperation.id) : undefined}
             assetId={selectedAsset?.id ? String(selectedAsset.id) : undefined}
-            maxVisible={5}
+            maxVisible={4}
+            position="header"
           />
           
           {/* Theme Toggle Button */}

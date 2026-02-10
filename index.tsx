@@ -15,11 +15,7 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
-  // Temporarily disabled StrictMode to prevent double initialization of Google OAuth
-  // Re-enable in production if needed
-  // <React.StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
-  // </React.StrictMode>
+  <ThemeProvider>
+    <App />
+  </ThemeProvider>
 );

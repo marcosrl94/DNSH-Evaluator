@@ -144,21 +144,39 @@ const LoginPage: React.FC = () => {
 
   // Check for Google OAuth redirect callback on page load
   useEffect(() => {
+    // Check query parameters first (for some OAuth flows)
     const urlParams = new URLSearchParams(window.location.search);
-    const credentialFromQuery = urlParams.get('credential');
+    const credentialFromQuery = urlParams.get('credential') || urlParams.get('id_token');
     
-    // Check hash fragment for id_token (Google redirect mode)
+    // Check hash fragment for id_token (Google redirect mode with response_type=id_token)
+    // Google redirects with: #id_token=... or #credential=...
     let credentialFromHash: string | null = null;
     if (window.location.hash) {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      credentialFromHash = hashParams.get('id_token');
+      const hash = window.location.hash.substring(1);
+      // Try parsing as URLSearchParams first
+      try {
+        const hashParams = new URLSearchParams(hash);
+        credentialFromHash = hashParams.get('id_token') || hashParams.get('credential');
+      } catch (e) {
+        // If hash is not in param format, check if it's just the token directly
+        // Some Google flows return: #id_token=TOKEN or #credential=TOKEN
+        if (hash.startsWith('id_token=')) {
+          credentialFromHash = hash.substring('id_token='.length).split('&')[0];
+        } else if (hash.startsWith('credential=')) {
+          credentialFromHash = hash.substring('credential='.length).split('&')[0];
+        }
+      }
     }
     
     const credential = credentialFromQuery || credentialFromHash;
     
     if (credential) {
-      // Clean URL immediately
-      window.history.replaceState({}, document.title, window.location.pathname);
+      console.log('[Google OAuth] Callback detected, processing credential...');
+      console.log('[Google OAuth] Origin:', window.location.origin);
+      
+      // Clean URL immediately to prevent re-processing
+      const cleanUrl = window.location.pathname + (window.location.search ? window.location.search.replace(/[?&](credential|id_token)=[^&]*/g, '') : '');
+      window.history.replaceState({}, document.title, cleanUrl);
       
       // Process the credential
       (async () => {
@@ -169,10 +187,22 @@ const LoginPage: React.FC = () => {
           await loginWithGoogle(rememberMe, keepSignedIn, credential);
           setLoginSuccess(true);
         } catch (err: any) {
+          console.error('[Google OAuth] Error processing credential:', err);
           setLocalError(err.message || 'Error al procesar la autenticación de Google');
         }
       })();
       return;
+    }
+    
+    // Check for error in URL (Google OAuth errors)
+    const errorParam = urlParams.get('error') || (window.location.hash.includes('error=') ? new URLSearchParams(window.location.hash.substring(1)).get('error') : null);
+    if (errorParam) {
+      console.error('[Google OAuth] Error from Google:', errorParam);
+      const errorDescription = urlParams.get('error_description') || 
+        (window.location.hash.includes('error_description=') ? new URLSearchParams(window.location.hash.substring(1)).get('error_description') : null);
+      setLocalError(`Error de Google: ${errorParam}${errorDescription ? ` - ${decodeURIComponent(errorDescription)}` : ''}`);
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [loginWithGoogle, rememberMe, keepSignedIn, clearError]);
 
@@ -365,9 +395,13 @@ const LoginPage: React.FC = () => {
             const nonce = Date.now().toString() + Math.random().toString(36).substring(7);
             const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
             
-            // Debug: Log redirect URI to help troubleshoot (remove in production if needed)
+            // Debug: Log redirect URI to help troubleshoot
+            console.log('[Google OAuth] Initiating login...');
             console.log('[Google OAuth] Redirect URI:', baseUrl);
-            console.log('[Google OAuth] Full auth URL:', authUrl.substring(0, 200) + '...');
+            console.log('[Google OAuth] Client ID:', GOOGLE_CLIENT_ID.substring(0, 20) + '...');
+            console.log('[Google OAuth] Make sure this URI is in Google Cloud Console:');
+            console.log('[Google OAuth]   - Authorized JavaScript origins:', baseUrl);
+            console.log('[Google OAuth]   - Authorized redirect URIs:', baseUrl, 'and', baseUrl + '/');
             
             // Clone to remove ALL Google handlers
             const newButton = googleButton.cloneNode(true) as HTMLElement;
@@ -708,7 +742,7 @@ const LoginPage: React.FC = () => {
                 />
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} action="#" method="get" className="space-y-4">
                 {isRegisterMode ? (
                   <>
                     {/* Name */}

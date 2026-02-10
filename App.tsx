@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import { ActiveContextProvider } from './context/ActiveContext';
 import { OnlineUsersProvider } from './context/OnlineUsersContext';
+import { ToastProvider } from './components/Toast';
 import { hasPermission } from './services/auth';
 import { AssetDnshEvaluation, Operation, DnshObjective } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -16,6 +17,7 @@ import { socketService } from './src/services/socketService';
 import PalantirLoader from './components/PalantirLoader';
 import { AppSidebar } from './components/AppSidebar';
 import { AppHeader } from './components/AppHeader';
+import { FloatingOnlineUsers } from './components/FloatingOnlineUsers';
 
 // Lazy load heavy components for better performance
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
@@ -285,7 +287,6 @@ const AuthenticatedApp: React.FC = () => {
     if (operation) {
       setSelectedOperationId(operationId);
       setCurrentView('dnsh-evaluation');
-      // TODO: Navigate to specific objective if provided
     }
   }, [operations]);
 
@@ -544,6 +545,12 @@ const AuthenticatedApp: React.FC = () => {
           currentAsset={selectedAsset || undefined}
         />
       </Suspense>
+
+      {/* Floating Online Users - Always visible top-right */}
+      <FloatingOnlineUsers 
+        operationId={selectedOperationId || undefined}
+        assetId={selectedAssetId || undefined}
+      />
     </div>
   );
 };
@@ -555,7 +562,9 @@ const App: React.FC = () => {
             <AuthProvider>
                 <OnlineUsersProvider>
                     <ActiveContextProvider>
-                        <AppContent />
+                        <ToastProvider>
+                            <AppContent />
+                        </ToastProvider>
                     </ActiveContextProvider>
                 </OnlineUsersProvider>
             </AuthProvider>

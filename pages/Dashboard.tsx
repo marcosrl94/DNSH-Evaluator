@@ -12,8 +12,10 @@ import { getAllOperations } from '../services/dataManagement';
 import { logger } from '../utils/logger';
 import { getAssetObjectiveStatus } from '../services/dnshEvaluationService';
 import MapViewer from '../components/MapViewer';
+import { OnlineUsersIndicator } from '../components/OnlineUsersIndicator';
 
 interface DashboardProps {
+  operations?: Operation[];
   onNavigateToOperation: (id: string) => void;
   onNavigateToOperationsList?: () => void;
   onNavigateToClient?: (clientId: string) => void;
@@ -445,49 +447,58 @@ const DashboardPage: React.FC<DashboardProps> = ({
           </div>
         </div>
         
-        {/* View Mode Selector */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-2 rounded-lg border transition-all ${
-              viewMode === 'list'
-                ? theme === 'dark'
-                  ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88]'
-                  : 'bg-green-100 text-green-700 border-green-500'
-                : `${themeClasses.bg.tertiary} ${themeClasses.text.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30`
-            }`}
-            title="Vista Lista"
-          >
-            <Grid size={18} />
-          </button>
-          <button
-            onClick={() => setViewMode('map')}
-            className={`p-2 rounded-lg border transition-all ${
-              viewMode === 'map'
-                ? theme === 'dark'
-                  ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88]'
-                  : 'bg-green-100 text-green-700 border-green-500'
-                : `${themeClasses.bg.tertiary} ${themeClasses.text.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30`
-            }`}
-            title="Vista Mapa"
-          >
-            <MapPin size={18} />
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`p-2 rounded-lg border transition-all ${
-              viewMode === 'table'
-                ? theme === 'dark'
-                  ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88]'
-                  : 'bg-green-100 text-green-700 border-green-500'
-                : `${themeClasses.bg.tertiary} ${themeClasses.text.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30`
-            }`}
-            title="Vista Tabla"
-          >
-            <Table size={18} />
-          </button>
+        {/* Right Side Actions */}
+        <div className="flex items-center gap-3">
+          {/* Online Users Indicator */}
+          <OnlineUsersIndicator 
+            operationId={selectedOperationId || undefined}
+            maxVisible={4}
+            position="header"
+          />
+          
+          {/* View Mode Selector */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg border transition-all ${
+                viewMode === 'list'
+                  ? theme === 'dark'
+                    ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88]'
+                    : 'bg-green-100 text-green-700 border-green-500'
+                  : `${themeClasses.bg.tertiary} ${themeClasses.text.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30`
+              }`}
+              title="Vista Lista"
+            >
+              <Grid size={18} />
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`p-2 rounded-lg border transition-all ${
+                viewMode === 'map'
+                  ? theme === 'dark'
+                    ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88]'
+                    : 'bg-green-100 text-green-700 border-green-500'
+                  : `${themeClasses.bg.tertiary} ${themeClasses.text.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30`
+              }`}
+              title="Vista Mapa"
+            >
+              <MapPin size={18} />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`p-2 rounded-lg border transition-all ${
+                viewMode === 'table'
+                  ? theme === 'dark'
+                    ? 'bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88]'
+                    : 'bg-green-100 text-green-700 border-green-500'
+                  : `${themeClasses.bg.tertiary} ${themeClasses.text.secondary} ${themeClasses.border.default} hover:border-[#00ff88]/30`
+              }`}
+              title="Vista Tabla"
+            >
+              <Table size={18} />
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* Filters */}
       <div className={`${themeClasses.bg.secondary} rounded-xl shadow-sm border ${themeClasses.border.default} p-4`}>
@@ -670,12 +681,13 @@ const DashboardPage: React.FC<DashboardProps> = ({
           )}
         </>
       )}
+      </div>
     </div>
   );
 };
 
 // Client Card Component
-const ClientCard: React.FC<{
+interface ClientCardProps {
   clientStatus: ClientStatus;
   onClick: () => void;
   themeClasses: ReturnType<typeof getThemeClasses>;
@@ -683,7 +695,9 @@ const ClientCard: React.FC<{
   objectiveLabels: Record<DnshObjective, string>;
   objectiveColors: Record<DnshObjective, string>;
   statusColors: Record<string, string>;
-}> = ({ clientStatus, onClick, themeClasses, theme, objectiveLabels, objectiveColors, statusColors }) => {
+}
+
+const ClientCard: React.FC<ClientCardProps> = ({ clientStatus, onClick, themeClasses, theme, objectiveLabels, objectiveColors, statusColors }) => {
   const totalAssessed = clientStatus.compliantAssets + clientStatus.nonCompliantAssets + clientStatus.conditionalAssets;
   
   return (

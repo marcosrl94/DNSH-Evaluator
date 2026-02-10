@@ -14,6 +14,7 @@ import { getThemeClasses } from '../utils/themeUtils';
 import { useAuth } from '../context/AuthContext';
 import { archiveOperation } from '../services/dataManagement';
 import { logger } from '../utils/logger';
+import { OnlineUsersIndicator } from '../components/OnlineUsersIndicator';
 
 interface Props {
   operation: Operation;
@@ -213,22 +214,11 @@ const OperationDetailPage: React.FC<Props> = ({
 
   // Calculate journey progress
   const journeyProgress = useMemo(() => {
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:192',message:'Calculating journey progress',data:{operationId:String(operation.id||''),operationIdType:typeof operation.id,hasAssets:!!operation.assets,assetsCount:Array.isArray(operation.assets)?operation.assets.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    } catch (e) {}
-    // #endregion
-    
     try {
       const progress = calculateJourneyProgress(operation);
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:196',message:'Journey progress calculated',data:{progressStage:String(progress.stage),progressProgress:typeof progress.progress,progressProgressValue:progress.progress,lastUpdatedType:typeof progress.lastUpdated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       return progress;
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OperationDetail.tsx:196',message:'Error calculating journey progress',data:{error:String(e),errorStack:String((e as Error)?.stack||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
+      logger.warn('Error calculating journey progress:', e);
       // Return default progress on error
       return {
         operationId: String(operation.id || ''),
@@ -278,6 +268,13 @@ const OperationDetailPage: React.FC<Props> = ({
             </button>
           </div>
           <div className="flex items-center space-x-3">
+            {/* Online Users Indicator */}
+            <OnlineUsersIndicator 
+              operationId={operation.id}
+              maxVisible={4}
+              position="header"
+            />
+            
             <button 
               type="button"
               onClick={handleEditOperation}

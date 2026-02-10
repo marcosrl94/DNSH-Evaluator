@@ -64,23 +64,60 @@ class SocketService {
     this.token = token;
     this.socket = ioModule.io(SOCKET_URL, {
       auth: { token },
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
     });
 
     this.socket.on('connect', () => {
       logger.info('Socket.IO connected');
       // Request user info to populate online users list
       this.socket?.emit('users:get-list');
+      // Rejoin rooms if we were in any
+      if (this.lastOperationId) {
+        this.joinOperation(this.lastOperationId);
+      }
+      if (this.lastAssetId) {
+        this.joinAsset(this.lastAssetId);
+      }
     });
 
-    this.socket.on('disconnect', () => {
-      logger.info('Socket.IO disconnected');
+    this.socket.on('disconnect', (reason: string) => {
+      logger.info('Socket.IO disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        // Server disconnected, reconnect manually
+        this.socket?.connect();
+      }
+    });
+
+    this.socket.on('reconnect', (attemptNumber: number) => {
+      logger.info(`Socket.IO reconnected after ${attemptNumber} attempts`);
+      // Request user list again after reconnection
+      this.socket?.emit('users:get-list');
+    });
+
+    this.socket.on('reconnect_attempt', (attemptNumber: number) => {
+      logger.info(`Socket.IO reconnection attempt ${attemptNumber}`);
+    });
+
+    this.socket.on('reconnect_error', (error: any) => {
+      logger.warn('Socket.IO reconnection error:', error);
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      logger.error('Socket.IO reconnection failed');
     });
 
     this.socket.on('error', (error: any) => {
       logger.error('Socket.IO error:', error);
     });
   }
+
+  private lastOperationId?: string;
+  private lastAssetId?: string;
 
   updatePresence(operationId?: string, assetId?: string) {
     if (this.socket?.connected) {
@@ -100,25 +137,33 @@ class SocketService {
   }
 
   joinOperation(operationId: string) {
-    if (this.socket) {
+    this.lastOperationId = operationId;
+    if (this.socket?.connected) {
       this.socket.emit('join:operation', operationId);
     }
   }
 
   leaveOperation(operationId: string) {
-    if (this.socket) {
+    if (operationId === this.lastOperationId) {
+      this.lastOperationId = undefined;
+    }
+    if (this.socket?.connected) {
       this.socket.emit('leave:operation', operationId);
     }
   }
 
   joinAsset(assetId: string) {
-    if (this.socket) {
+    this.lastAssetId = assetId;
+    if (this.socket?.connected) {
       this.socket.emit('join:asset', assetId);
     }
   }
 
   leaveAsset(assetId: string) {
-    if (this.socket) {
+    if (assetId === this.lastAssetId) {
+      this.lastAssetId = undefined;
+    }
+    if (this.socket?.connected) {
       this.socket.emit('leave:asset', assetId);
     }
   }

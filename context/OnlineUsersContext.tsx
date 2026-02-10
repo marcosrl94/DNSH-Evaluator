@@ -215,18 +215,14 @@ export const OnlineUsersProvider: React.FC<{ children: ReactNode }> = ({ childre
       const now = new Date();
       setOnlineUsers(prev => 
         prev.filter(u => {
-          // #region agent log
           try {
-            const lastSeenRaw = u.lastSeen;
-            fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersContext.tsx:194',message:'Comparing lastSeen',data:{lastSeenType:typeof lastSeenRaw,isDate:lastSeenRaw instanceof Date,lastSeenValue:lastSeenRaw instanceof Date ? lastSeenRaw.toISOString() : String(lastSeenRaw)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            const lastSeen = lastSeenRaw instanceof Date ? lastSeenRaw : new Date(String(lastSeenRaw));
+            const lastSeen = u.lastSeen instanceof Date ? u.lastSeen : new Date(String(u.lastSeen));
             const timeSinceLastSeen = now.getTime() - lastSeen.getTime();
             return timeSinceLastSeen < 30000; // 30 seconds
           } catch (e) {
-            fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersContext.tsx:194',message:'Error comparing lastSeen',data:{conversionError:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            logger.warn('Error comparing lastSeen:', e);
             return false; // Remove user if we can't parse their lastSeen
           }
-          // #endregion
         })
       );
     }, 10000); // Check every 10 seconds
@@ -235,21 +231,11 @@ export const OnlineUsersProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, []);
 
   const usersInOperation = (operationId: string): OnlineUser[] => {
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersContext.tsx:203',message:'usersInOperation called',data:{operationIdType:typeof operationId,operationIdValue:String(operationId),onlineUsersCount:onlineUsers.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    } catch (e) {}
-    // #endregion
     const opIdStr = String(operationId);
     return onlineUsers.filter(u => String(u.currentOperationId || '') === opIdStr);
   };
 
   const usersInAsset = (assetId: string): OnlineUser[] => {
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7243/ingest/0de341da-91a4-415d-a166-bfc14a416ff3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersContext.tsx:207',message:'usersInAsset called',data:{assetIdType:typeof assetId,assetIdValue:String(assetId),onlineUsersCount:onlineUsers.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    } catch (e) {}
-    // #endregion
     const assetIdStr = String(assetId);
     return onlineUsers.filter(u => String(u.currentAssetId || '') === assetIdStr);
   };

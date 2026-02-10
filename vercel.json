@@ -10,6 +10,13 @@
       "destination": "/index.html"
     }
   ],
+  "routes": [
+    {
+      "src": "/",
+      "methods": ["GET", "HEAD"],
+      "dest": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

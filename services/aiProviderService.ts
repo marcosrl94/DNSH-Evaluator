@@ -5,6 +5,8 @@
  * for enhanced report generation
  */
 
+import { logger } from '../utils/logger';
+
 export enum AIProvider {
   OPENAI_GPT4 = 'openai-gpt4',
   OPENAI_GPT4_TURBO = 'openai-gpt4-turbo',
@@ -291,7 +293,7 @@ export function getAvailableProvidersForUser(userEmail: string): AIProvider[] {
       }
     });
   } catch (error) {
-    console.error('Error getting available providers:', error);
+    logger.error('Error getting available providers:', error, { component: 'AIProviderService', action: 'getAvailableProviders' });
     return [];
   }
 }
@@ -371,7 +373,7 @@ export function getUserLicense(userEmail: string): UserAILicense {
     
     return licenseMap[emailDomain] || licenseMap['default'];
   } catch (error) {
-    console.error('Error getting user license:', error);
+    logger.error('Error getting user license:', error, { component: 'AIProviderService', action: 'getUserLicense', userEmail });
     // Return default free license on error
     return {
       email: userEmail || '',
@@ -454,7 +456,7 @@ export function recommendProvider(
     
     return availableProviders.length > 0 ? availableProviders[0] : AIProvider.LOCAL_LLM;
   } catch (error) {
-    console.error('Error recommending provider:', error);
+    logger.error('Error recommending provider:', error, { component: 'AIProviderService', action: 'recommendProvider', useCase });
     return null;
   }
 }
@@ -468,7 +470,7 @@ export function getProviderConfig(provider: AIProvider): AIProviderConfig | null
     const config = AI_PROVIDERS[provider];
     return config || null;
   } catch (error) {
-    console.error(`Error getting provider config for ${provider}:`, error);
+    logger.error(`Error getting provider config for ${provider}:`, error, { component: 'AIProviderService', action: 'getProviderConfig', provider });
     return null;
   }
 }

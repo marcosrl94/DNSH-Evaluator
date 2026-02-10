@@ -301,6 +301,8 @@ export async function generateReportSectionWithAI(
     metrics?: any;
     objectiveCompliance?: any;
     riskDistribution?: any;
+    detailedDnshData?: any;
+    customPrompt?: string; // Custom prompt override
   },
   existingContent?: string
 ): Promise<string> {
@@ -324,95 +326,30 @@ Características de tu estilo:
 
 Genera contenido en español, usando formato Markdown.`;
 
+    // Use custom prompt if provided, otherwise generate default
     let prompt = '';
     
-    // Map section types to use cases
-    const sectionTypeMap: Record<string, string> = {
-    'executive_summary': 'executive_summary',
-    'dnsh_compliance': 'detailed_analysis',
-    'risk_assessment': 'technical_analysis',
-    'evidence_review': 'detailed_analysis',
-    'financial_metrics': 'financial_analysis',
-    'geographic_analysis': 'detailed_analysis',
-      'recommendations': 'executive_summary'
-    };
+    if (context.customPrompt) {
+      // Use custom prompt directly
+      prompt = context.customPrompt;
+    } else {
+      // Import prompt service functions
+      const { getDefaultPromptForSection, buildDetailedDNSHContext } = await import('./reportPromptService');
+      
+      // Build detailed DNSH context
+      const detailedDnshData = buildDetailedDNSHContext(context.operation, context.asset);
+      
+      // Get default prompt for section
+      prompt = getDefaultPromptForSection(sectionType as any, {
+        ...context,
+        detailedDnshData
+      });
+    }
     
-    const useCase = sectionTypeMap[sectionType] || 'detailed_analysis';
-    
-    switch (sectionType) {
-    case 'executive_summary':
-      prompt = `Genera un Resumen Ejecutivo profesional y completo para un reporte DNSH. 
-
-Contexto:
-${JSON.stringify(context, null, 2)}
-
-El resumen debe incluir:
-1. Contexto y alcance del análisis
-2. Hallazgos principales con métricas específicas
-3. Análisis por objetivo DNSH identificando fortalezas y debilidades
-4. Evaluación de riesgos climáticos con datos específicos
-5. Conclusiones ejecutivas basadas en los datos
-6. Próximos pasos recomendados con acciones específicas
-
-${existingContent ? `\nContenido existente para mejorar:\n${existingContent}` : ''}`;
-      break;
-      
-    case 'dnsh_compliance':
-      prompt = `Genera una sección detallada de Cumplimiento DNSH.
-
-Contexto:
-${JSON.stringify(context, null, 2)}
-
-La sección debe incluir:
-1. Análisis detallado por cada uno de los 6 objetivos DNSH
-2. Identificación de activos/operaciones problemáticas específicas
-3. Análisis de causas raíz donde sea posible
-4. Recomendaciones específicas por objetivo
-5. Estrategia de mejora continua
-
-${existingContent ? `\nContenido existente para mejorar:\n${existingContent}` : ''}`;
-      break;
-      
-    case 'risk_assessment':
-      prompt = `Genera una Evaluación Detallada de Riesgos Climáticos.
-
-Contexto:
-${JSON.stringify(context, null, 2)}
-
-La evaluación debe incluir:
-1. Análisis de exposición financiera (AAL si está disponible)
-2. Identificación de operaciones críticas con detalles específicos
-3. Análisis de tipos de riesgos identificados
-4. Recomendaciones específicas por nivel de riesgo
-5. Métricas de seguimiento propuestas
-
-${existingContent ? `\nContenido existente para mejorar:\n${existingContent}` : ''}`;
-      break;
-      
-    case 'recommendations':
-      prompt = `Genera Recomendaciones Estratégicas y Acciones Prioritarias.
-
-Contexto:
-${JSON.stringify(context, null, 2)}
-
-Las recomendaciones deben:
-1. Estar priorizadas por plazo (corto, mediano, largo)
-2. Ser específicas y accionables
-3. Incluir métricas de éxito
-4. Especificar recursos requeridos
-5. Basarse en los datos reales del análisis
-
-${existingContent ? `\nContenido existente para mejorar:\n${existingContent}` : ''}`;
-      break;
-      
-    default:
-      prompt = `Genera contenido profesional para la sección "${sectionType}" de un reporte DNSH.
-
-Contexto:
-${JSON.stringify(context, null, 2)}
-
-${existingContent ? `\nContenido existente para mejorar:\n${existingContent}` : ''}`;
-  }
+    // Add existing content reference if available
+    if (existingContent) {
+      prompt += `\n\nContenido existente para mejorar o expandir:\n${existingContent}`;
+    }
   
     const response = await generateWithAI({
       provider,

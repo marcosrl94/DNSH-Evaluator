@@ -35,18 +35,29 @@ export enum ReportSectionType {
   RECOMMENDATIONS = 'recommendations'
 }
 
+export interface SectionPrompt {
+  id: string;
+  position: 'before' | 'after' | 'replace'; // Where to apply the prompt
+  prompt: string; // Custom AI prompt for this section
+  enabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ReportSection {
   id: string;
   type: ReportSectionType;
   title: string;
   content: string;
   editable: boolean;
+  customPrompts?: SectionPrompt[]; // Localized prompts for AI generation
   metadata?: {
     lastModified?: string;
     modifiedBy?: string;
     version?: number;
     aiGenerated?: boolean;
     evidenceReferences?: string[];
+    dnshDataLinked?: boolean; // Flag indicating if section uses detailed DNSH data
   };
 }
 
