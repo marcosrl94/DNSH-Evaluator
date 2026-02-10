@@ -1,9 +1,18 @@
 /**
  * API Service
  * Centralized API client for backend communication
+ * En producción las peticiones deben ir al backend (Railway), nunca al origen del front (Vercel).
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+const envApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+const isProd = import.meta.env.PROD;
+// En producción, si falta VITE_API_URL, usar la URL del backend en Railway para no hacer POST al front (405)
+const FALLBACK_PRODUCTION_API = 'https://dnsh-evaluator-production.up.railway.app/api/v1';
+const API_BASE_URL = envApiUrl
+  ? envApiUrl
+  : isProd
+    ? FALLBACK_PRODUCTION_API
+    : 'http://localhost:3001/api/v1';
 
 interface ApiResponse<T> {
   data?: T;

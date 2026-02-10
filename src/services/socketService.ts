@@ -7,7 +7,14 @@
 
 import { logger } from '../../utils/logger';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+const envSocketUrl = (import.meta.env.VITE_SOCKET_URL || '').trim();
+const isProd = import.meta.env.PROD;
+const FALLBACK_PRODUCTION_SOCKET = 'https://dnsh-evaluator-production.up.railway.app';
+const SOCKET_URL = envSocketUrl
+  ? envSocketUrl
+  : isProd
+    ? FALLBACK_PRODUCTION_SOCKET
+    : 'http://localhost:3001';
 
 // Declare global Socket.IO types
 declare global {
