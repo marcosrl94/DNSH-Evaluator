@@ -1,9 +1,10 @@
 /**
  * Database Configuration
  * PostgreSQL connection and initialization
+ * Optimized for Railway (DATABASE_URL) and local dev
  */
 
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, PoolConfig } from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -12,21 +13,48 @@ dotenv.config();
 let pool: Pool | null = null;
 
 /**
+ * Build pool config for PostgreSQL
+ * - Railway: uses DATABASE_URL (internal or public); SSL auto-handled
+ * - Local: DATABASE_URL or DATABASE_HOST/PORT/etc
+ */
+function buildPoolConfig(): PoolConfig {
+  const connectionString = process.env.DATABASE_URL;
+  const isRailway = connectionString?.includes('railway.internal') || connectionString?.includes('.rlwy.net');
+
+  const baseConfig: PoolConfig = {
+    max: parseInt(process.env.DATABASE_POOL_SIZE || '10', 10),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  };
+
+  // Prefer DATABASE_URL (Railway, Heroku, etc.)
+  if (connectionString) {
+    return {
+      ...baseConfig,
+      connectionString,
+      // Railway public URL / external: enable SSL with self-signed cert tolerance
+      ...(isRailway && connectionString.includes('.rlwy.net') && {
+        ssl: { rejectUnauthorized: false },
+      }),
+    };
+  }
+
+  // Fallback: individual params (local dev)
+  return {
+    ...baseConfig,
+    host: process.env.DATABASE_HOST || 'localhost',
+    port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+    database: process.env.DATABASE_NAME || 'ecoinvest_dnsh_evaluator',
+    user: process.env.DATABASE_USER || 'postgres',
+    password: process.env.DATABASE_PASSWORD,
+  };
+}
+
+/**
  * Initialize database connection pool
  */
 export async function initDatabase(): Promise<void> {
-  const config = {
-    connectionString: process.env.DATABASE_URL,
-    host: process.env.DATABASE_HOST,
-    port: parseInt(process.env.DATABASE_PORT || '5432'),
-    database: process.env.DATABASE_NAME,
-    user: process.env.DATABASE_USER,
-    password: process.env.DATABASE_PASSWORD,
-    max: 20, // Maximum number of clients in the pool
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-  };
-
+  const config = buildPoolConfig();
   pool = new Pool(config);
 
   // Handle pool errors
