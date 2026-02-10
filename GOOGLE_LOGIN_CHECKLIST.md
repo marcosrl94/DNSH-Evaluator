@@ -22,8 +22,10 @@ En **Railway** → backend → **Variables**:
 | Variable | Valor |
 |----------|-------|
 | `CORS_ORIGIN` | `https://dnsh-evaluator.vercel.app` |
-| `GOOGLE_CLIENT_ID` | El mismo que en Vercel (opcional, backend puede validar sin él) |
-| `ALLOWED_DOMAINS` | `gmail.com,googlemail.com` (si quieres restringir dominios) |
+| `GOOGLE_CLIENT_ID` | El mismo que en Vercel (opcional) |
+| `ALLOWED_DOMAINS` | **`gmail.com,googlemail.com`** (OBLIGATORIO para cuentas @gmail; sin esto → 403) |
+
+> Si ves **403 Forbidden** en `/auth/google`, añade tu dominio a `ALLOWED_DOMAINS` o déjalo vacío para permitir todos.
 
 ## 3. Google Cloud Console
 

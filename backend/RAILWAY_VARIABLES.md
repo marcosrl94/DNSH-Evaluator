@@ -20,8 +20,11 @@ NODE_ENV=production
 ```env
 API_PREFIX=/api/v1
 LOG_LEVEL=info
+# CRÍTICO para login con Google: sin esto, cuentas @gmail.com reciben 403
 ALLOWED_DOMAINS=gmail.com,googlemail.com
 ```
+
+> **403 en auth/google**: Si ves "Permission denied" al hacer login con Google, añade tu dominio (ej. `gmail.com`) a `ALLOWED_DOMAINS` en Railway. Si no defines `ALLOWED_DOMAINS`, se permiten todos los dominios.
 
 ## 🟢 OPCIONALES (Solo si necesitas almacenar archivos):
 
