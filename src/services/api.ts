@@ -12,7 +12,11 @@ function getApiBaseUrl(): string {
   let base = envApiUrl
     ? envApiUrl
     : FALLBACK_PRODUCTION_API;
-  // En producción en el navegador: nunca usar el mismo origen (evita 405 si VITE_API_URL apunta al front)
+  // CRÍTICO: Railway devuelve 405 si usas HTTP (301 redirect convierte POST en GET)
+  if (base.startsWith('http://') && isProd) {
+    base = base.replace(/^http:\/\//i, 'https://');
+  }
+  // En producción: nunca usar el mismo origen (evita 405 si VITE_API_URL apunta al front)
   if (typeof window !== 'undefined' && isProd) {
     const origin = window.location.origin.replace(/\/$/, '');
     const normalized = base.replace(/\/$/, '');

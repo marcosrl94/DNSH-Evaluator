@@ -93,7 +93,8 @@ app.use(helmet({
 app.use(compression()); // Gzip compression
 app.use(cors({
   origin: corsOrigins,
-  credentials: true
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

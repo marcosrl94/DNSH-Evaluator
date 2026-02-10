@@ -51,13 +51,14 @@ El script te guiará paso a paso.
    - **Authorized JavaScript origins**:
      ```
      http://localhost:3000
+     https://dnsh-evaluator.vercel.app
      ```
-     (Añade tu dominio de producción después)
-   - **Authorized redirect URIs**:
+   - **Authorized redirect URIs** (debe ser el FRONTEND, no el backend):
      ```
      http://localhost:3000
+     https://dnsh-evaluator.vercel.app
+     https://dnsh-evaluator.vercel.app/login
      ```
-     (Añade tu dominio de producción después)
 6. Haz clic en **Create**
 7. **Copia el Client ID** que aparece (algo como: `123456789-abcdefghijklmnop.apps.googleusercontent.com`)
 
@@ -96,6 +97,15 @@ Si todo está configurado correctamente:
 - ✅ Después del login, eres redirigido al dashboard
 
 ## 🐛 Solución de Problemas
+
+### HTTP ERROR 405 al hacer login con Google
+- **Causa**: La URL de la API usa `http://` en vez de `https://`. Railway redirige y el navegador convierte POST en GET → 405.
+- **Solución**: En **Vercel → Settings → Environment Variables**, asegúrate de que `VITE_API_URL` sea **https** (no http):
+  ```
+  VITE_API_URL=https://dnsh-evaluator-production.up.railway.app/api/v1
+  ```
+- En **Railway** → backend → Variables: `CORS_ORIGIN` debe incluir `https://dnsh-evaluator.vercel.app`
+- Añade `ALLOWED_DOMAINS=gmail.com,googlemail.com` en Railway si usas cuentas @gmail.com
 
 ### El botón no aparece
 - Verifica que `.env.local` existe y tiene `VITE_GOOGLE_CLIENT_ID`
