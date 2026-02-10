@@ -62,7 +62,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isOpen, isActive
   );
 };
 
-type ViewType = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail' | 'dnsh-evaluation' | 'map-viewer' | 'catalogs' | 'reports' | 'deal-management' | 'historical-operations';
+type ViewType = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail' | 'dnsh-evaluation' | 'map-viewer' | 'catalogs' | 'reports' | 'deal-management' | 'historical-operations' | 'settings';
 
 interface AppSidebarProps {
   isOpen: boolean;
@@ -255,9 +255,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           icon={<Settings size={20} />} 
           label="SETTINGS" 
           isOpen={isOpen} 
-          isActive={false}
+          isActive={currentView === 'settings'}
           theme={theme}
-          onClick={() => {}} 
+          onClick={() => handleNavigation('settings')} 
         />
       </nav>
 

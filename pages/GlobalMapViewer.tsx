@@ -9,6 +9,7 @@ import {
 import { Asset, HazardType, Client, Operation, DnshObjective } from '../types';
 import { getObjectiveStatusFromAsset } from '../utils/dnshCalculations';
 import { getAssetObjectiveStatus } from '../services/dnshEvaluationService';
+import { formatLargeNumber } from '../utils/common';
 import { logger } from '../utils/logger';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
@@ -103,6 +104,30 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
   
   const selectedAsset = allAssets.find(a => a.id === selectedAssetId);
   const selectedClient = selectedClientId ? cl.find(c => c.id === selectedClientId) : null;
+
+  // Métricas globales calculadas desde los assets visibles (no valores hardcodeados)
+  const globalStats = useMemo(() => {
+    const totalExposure = allAssets.reduce((sum, a) => sum + (a.exposedValue ?? 0), 0);
+    const riskScores: number[] = [];
+    allAssets.forEach(a => {
+      const band = a.dnshEvaluation?.adaptationRiskBand;
+      if (band) {
+        const v = { Low: 20, Moderate: 45, High: 70, 'Very High': 95 }[band];
+        if (v != null) riskScores.push(v);
+      }
+    });
+    const avgRisk = riskScores.length > 0
+      ? Math.round(riskScores.reduce((a, b) => a + b, 0) / riskScores.length)
+      : null;
+    const activeAlerts = allAssets.filter(
+      a => a.dnshEvaluation?.overallStatus === 'Non-Compliant'
+    ).length;
+    return {
+      totalExposure: totalExposure > 0 ? formatLargeNumber(totalExposure) : '€0',
+      avgRiskScore: avgRisk != null ? `${avgRisk}/100` : 'N/A',
+      activeAlerts,
+    };
+  }, [allAssets]);
   const selectedOperation = selectedOperationId 
     ? ops.find(op => op.id === selectedOperationId)
     : selectedAsset 
@@ -260,13 +285,13 @@ const GlobalMapViewerPage: React.FC<GlobalMapViewerPageProps> = ({
                  </div>
             </div>
 
-            {/* Global Stats Ticker */}
+            {/* Global Stats Ticker - calculados desde assets visibles */}
             <div className={`hidden lg:flex items-center space-x-1 backdrop-blur-md border rounded-xl p-1 shadow-2xl ${themeClasses.bg.card} ${themeClasses.border.default}`}>
-                <StatItem label="Total Exposure" value="€185.4M" color={themeClasses.text.primary} />
+                <StatItem label="Total Exposure" value={globalStats.totalExposure} color={themeClasses.text.primary} />
                 <div className={`w-px h-8 mx-2 ${themeClasses.border.default}`}></div>
-                <StatItem label="Avg Risk Score" value="72/100" color="text-amber-500" icon={<AlertTriangle size={12} />} />
+                <StatItem label="Avg Risk Score" value={globalStats.avgRiskScore} color="text-amber-500" icon={<AlertTriangle size={12} />} />
                 <div className={`w-px h-8 mx-2 ${themeClasses.border.default}`}></div>
-                <StatItem label="Active Alerts" value="3" color="text-red-500" />
+                <StatItem label="Active Alerts" value={String(globalStats.activeAlerts)} color="text-red-500" />
             </div>
 
             {/* Search */}

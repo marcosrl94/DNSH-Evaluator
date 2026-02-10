@@ -31,6 +31,7 @@ const LoginPage = lazy(() => import('./pages/Login'));
 const ClientDetailPage = lazy(() => import('./pages/ClientDetail'));
 const DealManagementPage = lazy(() => import('./pages/DealManagement'));
 const HistoricalOperationsPage = lazy(() => import('./pages/HistoricalOperations'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
 // ClientDnshEvaluationPage removed - unified in DnshEvaluationEnhancedPage
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
 const CollaborationNotification = lazy(() => import('./components/CollaborationNotification'));
@@ -45,7 +46,7 @@ const LoadingFallback: React.FC = () => (
   </div>
 );
 
-type View = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail' | 'dnsh-evaluation' | 'map-viewer' | 'catalogs' | 'reports' | 'deal-management' | 'historical-operations';
+type View = 'dashboard' | 'operation-list' | 'operation-detail' | 'client-detail' | 'dnsh-evaluation' | 'map-viewer' | 'catalogs' | 'reports' | 'deal-management' | 'historical-operations' | 'settings';
 
 // Separate component for the authenticated layout to use the hook
 const AuthenticatedApp: React.FC = () => {
@@ -319,6 +320,12 @@ const AuthenticatedApp: React.FC = () => {
             <HistoricalOperationsPage 
               onNavigateToOperation={navigateToOperation}
             />
+          </Suspense>
+        );
+      case 'settings':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <SettingsPage />
           </Suspense>
         );
       case 'operation-detail':
