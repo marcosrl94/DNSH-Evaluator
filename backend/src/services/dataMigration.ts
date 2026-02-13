@@ -78,59 +78,91 @@ export async function migrateDemoData(): Promise<void> {
     );
     logger.info('Linked admin to demo organization');
 
-    // 4. Check if demo operation already exists (idempotent)
+    // 4. Get or create demo client
+    let clientId: string;
+    const existingClient = await client.query(
+      `SELECT id FROM clients WHERE name = 'EcoEnergy Iberia' AND organization_id = $1 LIMIT 1`,
+      [orgId]
+    );
+    if (existingClient.rows.length > 0) {
+      clientId = existingClient.rows[0].id;
+      logger.info('Using existing demo client: EcoEnergy Iberia');
+    } else {
+      const clientResult = await client.query(
+        `INSERT INTO clients (name, country, sector, description, created_by, organization_id)
+         VALUES ('EcoEnergy Iberia', 'Spain', 'Renewable Energy',
+           'Leading renewable energy developer in the Iberian Peninsula',
+           $1, $2)
+         RETURNING id`,
+        [adminId, orgId]
+      );
+      clientId = clientResult.rows[0].id;
+      logger.info('Created demo client: EcoEnergy Iberia');
+    }
+
+    // 5. Get or create demo operation (Iberia Solar PV Portfolio)
+    let operationId: string;
     const existingOp = await client.query(
-      `SELECT o.id FROM operations o
+      `SELECT o.id, (SELECT COUNT(*)::int FROM assets WHERE operation_id = o.id) as asset_count
+       FROM operations o
        JOIN clients c ON o.client_id = c.id
        WHERE c.name = 'EcoEnergy Iberia' AND o.name = 'Iberia Solar PV Portfolio'
        LIMIT 1`
     );
-    if (existingOp.rows.length > 0) {
-      logger.info('Demo operation already exists, skipping creation');
+    if (existingOp.rows.length > 0 && existingOp.rows[0].asset_count >= 3) {
+      logger.info('Demo operation already exists with assets, skipping');
       await client.query('COMMIT');
       return;
     }
+    if (existingOp.rows.length > 0) {
+      operationId = existingOp.rows[0].id;
+      logger.info('Demo operation exists without assets, adding assets...');
+    } else {
+      const opResult = await client.query(
+        `INSERT INTO operations (
+           client_id, name, sector_nace, country, capex, deal_price,
+           expected_return, risk_weighted_capital, total_aal, max_risk_band,
+           sustainability_discount, risk_adjustment, status,
+           substantial_contribution_id, created_by, organization_id
+         )
+         VALUES ($1, $2, 'D.35.11', 'Spain', 45000000, 42000000,
+           8.5, 38000000, 1250000, 'Moderate',
+           2.5, -1.2, 'Review',
+           'MITIGATION', $3, $4)
+         RETURNING id`,
+        [clientId, 'Iberia Solar PV Portfolio', adminId, orgId]
+      );
+      operationId = opResult.rows[0].id;
+      logger.info('Created demo operation: Iberia Solar PV Portfolio');
 
-    // 5. Create demo client
-    const clientResult = await client.query(
-      `INSERT INTO clients (name, country, sector, description, created_by, organization_id)
-       VALUES ('EcoEnergy Iberia', 'Spain', 'Renewable Energy',
-         'Leading renewable energy developer in the Iberian Peninsula',
-         $1, $2)
-       RETURNING id`,
-      [adminId, orgId]
+      // Grant permissions to admin
+      await client.query(
+        `INSERT INTO user_operation_permissions (
+           user_id, operation_id, can_view, can_edit, can_review, can_approve, can_delete, granted_by
+         )
+         VALUES ($1, $2, true, true, true, true, true, $1)
+         ON CONFLICT (user_id, operation_id) DO NOTHING`,
+        [adminId, operationId]
+      );
+    }
+
+    // 6. Create assets (skip if operation already has 3, else remove any partial and create 3)
+    const assetCount = await client.query(
+      'SELECT COUNT(*)::int as cnt FROM assets WHERE operation_id = $1',
+      [operationId]
     );
-    const clientId = clientResult.rows[0].id;
-    logger.info('Created demo client: EcoEnergy Iberia');
+    if (assetCount.rows[0].cnt >= 3) {
+      logger.info('Assets already exist, skipping');
+      await client.query('COMMIT');
+      return;
+    }
+    // Si hay activos parciales (0, 1 o 2), borrarlos para crear 3 completos (CASCADE borra attributes y evaluations)
+    if (assetCount.rows[0].cnt > 0) {
+      await client.query('DELETE FROM assets WHERE operation_id = $1', [operationId]);
+      logger.info('Removed partial assets, recreating...');
+    }
 
-    // 6. Create demo operation (Iberia Solar PV Portfolio)
-    const opResult = await client.query(
-      `INSERT INTO operations (
-         client_id, name, sector_nace, country, capex, deal_price,
-         expected_return, risk_weighted_capital, total_aal, max_risk_band,
-         sustainability_discount, risk_adjustment, status,
-         substantial_contribution_id, created_by, organization_id
-       )
-       VALUES ($1, $2, 'D.35.11', 'Spain', 45000000, 42000000,
-         8.5, 38000000, 1250000, 'Moderate',
-         2.5, -1.2, 'Review',
-         'MITIGATION', $3, $4)
-       RETURNING id`,
-      [clientId, 'Iberia Solar PV Portfolio', adminId, orgId]
-    );
-    const operationId = opResult.rows[0].id;
-    logger.info('Created demo operation: Iberia Solar PV Portfolio');
-
-    // 7. Grant permissions to admin
-    await client.query(
-      `INSERT INTO user_operation_permissions (
-         user_id, operation_id, can_view, can_edit, can_review, can_approve, can_delete, granted_by
-       )
-       VALUES ($1, $2, true, true, true, true, true, $1)`,
-      [adminId, operationId]
-    );
-
-    // 8. Create assets with attributes
+    // 7. Create assets with attributes and evaluations
     const assetsData = [
       {
         name: 'Seville PV Plant A',

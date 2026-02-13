@@ -4,6 +4,7 @@ import { Operation, Client } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
 import { getArchivedOperations, unarchiveOperation, getAllClients } from '../services/dataManagement';
+import { getOperationAssetCount } from '../utils/apiTransformers';
 import { useAuth } from '../context/AuthContext';
 import { dataStore } from '../services/dataManagement';
 import { logger } from '../utils/logger';
@@ -26,7 +27,7 @@ const calculateOperationDnshStatus = (operation: Operation): {
     notAssessed: number;
   };
 } => {
-  const totalAssets = operation.assets.length;
+  const totalAssets = getOperationAssetCount(operation);
   
   if (totalAssets === 0) {
     return {
@@ -290,7 +291,7 @@ const HistoricalOperationsPage: React.FC<Props> = ({ onNavigateToOperation }) =>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col">
                       <span className={`text-sm font-bold ${themeClasses.text.primary} font-mono uppercase tracking-wider`}>{op.name.replace(/\s/g, '_')}</span>
-                      <span className={`text-xs ${themeClasses.text.tertiary} font-mono uppercase`}>{op.assets.length} {op.assets.length === 1 ? 'ASSET' : 'ACTIVOS'}</span>
+                      <span className={`text-xs ${themeClasses.text.tertiary} font-mono uppercase`}>{getOperationAssetCount(op)} {getOperationAssetCount(op) === 1 ? 'ASSET' : 'ACTIVOS'}</span>
                     </div>
                   </td>
                   <td className={`px-6 py-4 whitespace-nowrap text-sm ${themeClasses.text.secondary} font-mono`}>

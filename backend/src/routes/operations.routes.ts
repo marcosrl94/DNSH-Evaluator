@@ -348,7 +348,8 @@ router.post(
         capex,
         dealPrice,
         expectedReturn,
-        substantialContributionId
+        substantialContributionId,
+        assets: assetsPayload
       } = req.body;
 
       const userId = req.userId;
@@ -391,34 +392,77 @@ router.post(
         }
       }
 
-      const operations = await query<{ id: string }>(
-        `INSERT INTO operations (
-          client_id, name, sector_nace, country, capex, deal_price,
-          expected_return, substantial_contribution_id, created_by, status, organization_id
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Draft', $10)
-        RETURNING id`,
-        [
-          clientId,
-          name,
-          sectorNACE || null,
-          country,
-          capex || null,
-          dealPrice || null,
-          expectedReturn || null,
-          substantialContributionId || null,
-          userId,
-          organizationId
-        ]
-      );
+      const operationId = await transaction(async (client) => {
+        const opsResult = await client.query<{ id: string }>(
+          `INSERT INTO operations (
+            client_id, name, sector_nace, country, capex, deal_price,
+            expected_return, substantial_contribution_id, created_by, status, organization_id
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Draft', $10)
+          RETURNING id`,
+          [
+            clientId,
+            name,
+            sectorNACE || null,
+            country,
+            capex || null,
+            dealPrice || null,
+            expectedReturn || null,
+            substantialContributionId || null,
+            userId,
+            organizationId
+          ]
+        );
 
-      if (operations.length === 0) {
-        throw createError('Failed to create operation', 500);
-      }
+        if (opsResult.rows.length === 0) {
+          throw createError('Failed to create operation', 500);
+        }
 
-      const operationId = operations[0].id;
+        const opId = opsResult.rows[0].id;
 
-      // Grant creator full permissions
+        // Create assets when provided
+        const assets = Array.isArray(assetsPayload) ? assetsPayload : [];
+        for (const a of assets) {
+          const an = a.name?.trim?.();
+          const at = (a.assetType || a.asset_type)?.trim?.();
+          const alat = parseFloat(a.lat);
+          const alng = parseFloat(a.lng);
+          if (!an || !at || isNaN(alat) || isNaN(alng)) continue;
+          const assetResult = await client.query<{ id: string }>(
+            `INSERT INTO assets (operation_id, name, asset_type, lat, lng, exposed_value)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id`,
+            [opId, an, at, alat, alng, a.exposedValue ?? a.exposed_value ?? null]
+          );
+          const assetId = assetResult.rows[0]?.id;
+          if (!assetId) continue;
+          const attrs = a.attributes || {};
+          const hasAttrs = attrs.elevationMeters != null || attrs.distanceToCoastKm != null ||
+            attrs.yearBuilt != null || attrs.siteType != null || attrs.capacity != null || attrs.capacityUnit != null;
+          if (hasAttrs) {
+            await client.query(
+              `INSERT INTO asset_attributes (
+                asset_id, elevation_meters, distance_to_coast_km, year_built,
+                site_type, capacity, capacity_unit
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [
+                assetId,
+                attrs.elevationMeters ?? attrs.elevation_meters ?? null,
+                attrs.distanceToCoastKm ?? attrs.distance_to_coast_km ?? null,
+                attrs.yearBuilt ?? attrs.year_built ?? null,
+                attrs.siteType ?? attrs.site_type ?? null,
+                attrs.capacity ?? null,
+                attrs.capacityUnit ?? attrs.capacity_unit ?? null
+              ]
+            );
+          }
+        }
+
+        return opId;
+      });
+
+      // Grant creator full permissions (outside transaction for clarity)
       await query(
         `INSERT INTO user_operation_permissions (
           user_id, operation_id, can_view, can_edit, can_review, can_approve, can_delete, granted_by

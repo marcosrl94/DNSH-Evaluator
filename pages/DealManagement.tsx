@@ -17,6 +17,7 @@ import {
   parseAssetType,
   type ValidationResult
 } from '../utils/dealValidation';
+import { getOperationAssetCount } from '../utils/apiTransformers';
 
 interface DealFormData {
   // Cliente/Compañía
@@ -459,13 +460,33 @@ const DealManagement: React.FC = () => {
   const processBulkDeals = async (deals: Map<string, { deal: Partial<DealFormData>; assets: AssetFormData[] }>) => {
     let successCount = 0;
     let errorCount = 0;
+    const clientCache = new Map<string, string>(); // name -> id
+    const allClients = await getAllClients();
+    allClients.forEach(c => clientCache.set(c.name.trim().toLowerCase(), c.id));
+
+    const getOrCreateClient = async (dealData: Partial<DealFormData>): Promise<string> => {
+      const name = (dealData.clientName || '').trim();
+      if (!name) throw new Error('Nombre de cliente vacío');
+      const key = name.toLowerCase();
+      const cached = clientCache.get(key);
+      if (cached) return cached;
+      const newClient = await createClient({
+        name,
+        country: dealData.clientCountry || undefined,
+        sector: dealData.clientSector || undefined
+      });
+      clientCache.set(key, newClient.id);
+      return newClient.id;
+    };
+
+    const normalizeSubstantial = (v: any): DnshObjective => {
+      if (v && v !== 'N/A' && Object.values(DnshObjective).includes(v as DnshObjective)) return v as DnshObjective;
+      return DnshObjective.MITIGATION;
+    };
+
     for (const [dealName, dealData] of deals) {
       try {
-        const client = await createClient({
-          name: dealData.deal.clientName!,
-          country: dealData.deal.clientCountry || undefined,
-          sector: dealData.deal.clientSector || undefined
-        });
+        const clientId = await getOrCreateClient(dealData.deal!);
         const createdAssets: Asset[] = await Promise.all(
           dealData.assets.map(async (assetData, index) => {
             let elevationMeters = assetData.elevationMeters;
@@ -491,13 +512,13 @@ const DealManagement: React.FC = () => {
         );
         const capex = createdAssets.reduce((sum, a) => sum + (a.exposedValue || 0), 0);
         await createOperation({
-          clientId: client.id,
+          clientId,
           name: dealName,
           sectorNACE: dealData.deal.sectorNACE || '',
           country: dealData.deal.country || '',
           capex: capex || 0,
           dealPrice: dealData.deal.dealPrice,
-          substantialContributionId: dealData.deal.substantialContributionId || ('N/A' as DnshObjective | 'N/A'),
+          substantialContributionId: normalizeSubstantial(dealData.deal.substantialContributionId),
           status: 'Draft',
           assets: createdAssets,
           evidenceDocuments: []
@@ -1884,7 +1905,7 @@ const DealManagement: React.FC = () => {
                           </select>
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm ${themeClasses.text.secondary} font-mono`}>
-                          {op.assets.length} {op.assets.length === 1 ? 'ASSET' : 'ASSETS'}
+                          {getOperationAssetCount(op)} {getOperationAssetCount(op) === 1 ? 'ASSET' : 'ASSETS'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-2">

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ArrowLeft, Building2, Briefcase, ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, XCircle, Clock, ArrowRight, DollarSign, Percent, BarChart3, TrendingDown, Activity } from 'lucide-react';
 import { Client, Operation, DnshObjective, RiskBand } from '../types';
 import { calculateObjectiveStats, getOperationDnshSummary } from '../utils/dnshCalculations';
+import { getOperationAssetCount } from '../utils/apiTransformers';
 
 interface Props {
   client: Client;
@@ -56,7 +57,8 @@ const ClientDetailPage: React.FC<Props> = ({
     };
 
     safeOps.forEach(operation => {
-      if (!operation.assets || !Array.isArray(operation.assets)) {
+      const assetCount = getOperationAssetCount(operation);
+      if (assetCount === 0) {
         return;
       }
       // Financial metrics aggregation
@@ -81,7 +83,12 @@ const ClientDetailPage: React.FC<Props> = ({
         }
       }
 
-      operation.assets.forEach(asset => {
+      const assetsArray = operation.assets || [];
+      if (assetsArray.length === 0) {
+        totalAssets += assetCount;
+        notAssessedAssets += assetCount;
+      }
+      assetsArray.forEach(asset => {
         totalAssets++;
         const evaluation = asset.dnshEvaluation;
         
@@ -407,7 +414,7 @@ const ClientDetailPage: React.FC<Props> = ({
                       <span>•</span>
                       <span>{operation.country}</span>
                       <span>•</span>
-                      <span>{operation.assets.length} ASSETS</span>
+                      <span>{getOperationAssetCount(operation)} ASSETS</span>
                       <span>•</span>
                       <span className="font-medium text-white">€{(operation.capex / 1000000).toFixed(1)}M</span>
                     </div>

@@ -461,6 +461,7 @@ export interface Operation {
   status: 'Draft' | 'Review' | 'Compliant' | 'Non-Compliant';
   substantialContributionId: DnshObjective;
   assets: Asset[];
+  assetCount?: number; // Del listado API cuando no vienen assets (COUNT)
   evidenceDocuments?: EvidenceDocument[]; // Registry of evidence documents
   // Financial metrics
   dealPrice?: number; // Precio del deal (puede diferir de capex)

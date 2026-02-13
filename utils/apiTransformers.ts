@@ -29,6 +29,7 @@ export function transformApiOperation(op: any): Operation {
     status: (op.status || 'Draft') as 'Draft' | 'Review' | 'Compliant' | 'Non-Compliant',
     substantialContributionId: op.substantial_contribution_id || op.substantialContributionId,
     assets: Array.isArray(op.assets) ? op.assets.map((a: any) => transformApiAsset(a)) : [],
+    assetCount: op.asset_count != null ? parseInt(String(op.asset_count), 10) : undefined,
     evidenceDocuments: Array.isArray(op.evidenceDocuments) 
       ? op.evidenceDocuments 
       : (Array.isArray(op.evidence_documents) ? op.evidence_documents : []),
@@ -68,6 +69,16 @@ export function transformApiAsset(assetData: any): Asset {
     attributes: assetData.attributes || {},
     dnshEvaluation: assetData.dnshEvaluation || assetData.dnsh_evaluation || undefined,
   };
+}
+
+/**
+ * Obtiene el número de activos de una operación (para listados sin assets).
+ * Prefiere assets.length cuando existe; si no, usa assetCount del listado API.
+ */
+export function getOperationAssetCount(op: { assets?: any[]; assetCount?: number }): number {
+  if (Array.isArray(op.assets) && op.assets.length > 0) return op.assets.length;
+  if (op.assetCount != null && !Number.isNaN(op.assetCount)) return op.assetCount;
+  return 0;
 }
 
 /**
