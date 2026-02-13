@@ -133,35 +133,35 @@ router.get('/', async (req: any, res: Response) => {
     const operations = await query(sql, params);
 
     // Get total count
-    let countSql = 'SELECT COUNT(*) as total FROM operations WHERE 1=1';
+    let countSql = 'SELECT COUNT(*) as total FROM operations o WHERE 1=1';
     const countParams: any[] = [];
     let countParamIndex = 1;
 
     // Filter by organization in count query
     if (organizationId && req.user.role !== 'Admin') {
-      countSql += ` AND organization_id = $${countParamIndex}`;
+      countSql += ` AND o.organization_id = $${countParamIndex}`;
       countParams.push(organizationId);
       countParamIndex++;
     }
 
     if (status) {
-      countSql += ` AND status = $${countParamIndex}`;
+      countSql += ` AND o.status = $${countParamIndex}`;
       countParams.push(status);
       countParamIndex++;
     }
 
     if (clientId) {
-      countSql += ` AND client_id = $${countParamIndex}`;
+      countSql += ` AND o.client_id = $${countParamIndex}`;
       countParams.push(clientId);
       countParamIndex++;
     }
 
     if (req.user.role !== 'Admin') {
       countSql += ` AND (
-        created_by = $${countParamIndex} OR
+        o.created_by = $${countParamIndex} OR
         EXISTS (
           SELECT 1 FROM user_operation_permissions uop
-          WHERE uop.operation_id = operations.id AND uop.user_id = $${countParamIndex} AND uop.can_view = true
+          WHERE uop.operation_id = o.id AND uop.user_id = $${countParamIndex} AND uop.can_view = true
         )
       )`;
       countParams.push(req.userId);
@@ -222,16 +222,88 @@ router.get('/:id', async (req: any, res: Response) => {
       return res.status(404).json({ error: 'Operation not found' });
     }
 
-    // Get assets
-    const assets = await query(
-      `SELECT a.*, aa.*, e.overall_status as evaluation_status
+    // Get assets with full DNSH evaluation (latest per asset)
+    const assetsRaw = await query(
+      `SELECT a.*, aa.elevation_meters, aa.distance_to_coast_km, aa.year_built,
+              aa.flood_protection_level, aa.water_dependency, aa.temperature_tolerance_c,
+              aa.nace_code, aa.taxonomy_activity, aa.substantial_contribution, aa.site_type,
+              aa.materials, aa.construction_year, aa.operational_year, aa.capacity, aa.capacity_unit,
+              aa.adaptation_hazard_scope,
+              e.id as eval_id, e.overall_status, e.mitigation_status, e.adaptation_status,
+              e.adaptation_status_pre_measures, e.adaptation_status_post_measures,
+              e.adaptation_risk_band, e.water_status, e.circular_status, e.pollution_status,
+              e.biodiversity_status, e.overall_notes, e.evaluation_date, e.mitigation_evidence,
+              e.adaptation_measures, e.water_evidence, e.circular_evidence, e.pollution_evidence,
+              e.biodiversity_evidence
        FROM assets a
        LEFT JOIN asset_attributes aa ON aa.asset_id = a.id
-       LEFT JOIN dnsh_evaluations e ON e.asset_id = a.id
+       LEFT JOIN LATERAL (
+         SELECT * FROM dnsh_evaluations WHERE asset_id = a.id
+         ORDER BY evaluation_date DESC LIMIT 1
+       ) e ON true
        WHERE a.operation_id = $1
        ORDER BY a.name`,
       [id]
     );
+
+    // Transform assets with attributes object and dnshEvaluation for frontend
+    const assets = assetsRaw.map((row: any) => {
+      const attrs: Record<string, any> = {};
+      if (row.elevation_meters != null) attrs.elevationMeters = parseFloat(row.elevation_meters);
+      if (row.distance_to_coast_km != null) attrs.distanceToCoastKm = parseFloat(row.distance_to_coast_km);
+      if (row.year_built != null) attrs.yearBuilt = row.year_built;
+      if (row.flood_protection_level != null) attrs.floodProtectionLevel = row.flood_protection_level;
+      if (row.water_dependency != null) attrs.waterDependency = row.water_dependency;
+      if (row.temperature_tolerance_c != null) attrs.temperatureToleranceC = parseFloat(row.temperature_tolerance_c);
+      if (row.nace_code != null) attrs.naceCode = row.nace_code;
+      if (row.taxonomy_activity != null) attrs.taxonomyActivity = row.taxonomy_activity;
+      if (row.substantial_contribution != null) attrs.substantialContribution = row.substantial_contribution;
+      if (row.site_type != null) attrs.siteType = row.site_type;
+      if (row.materials != null) attrs.materials = row.materials;
+      if (row.construction_year != null) attrs.constructionYear = row.construction_year;
+      if (row.operational_year != null) attrs.operationalYear = row.operational_year;
+      if (row.capacity != null) attrs.capacity = parseFloat(row.capacity);
+      if (row.capacity_unit != null) attrs.capacityUnit = row.capacity_unit;
+      if (row.adaptation_hazard_scope != null) attrs.adaptationHazardScope = row.adaptation_hazard_scope;
+
+      const asset: any = {
+        id: row.id,
+        operation_id: row.operation_id,
+        name: row.name,
+        asset_type: row.asset_type,
+        lat: parseFloat(row.lat),
+        lng: parseFloat(row.lng),
+        exposed_value: parseFloat(row.exposed_value || 0),
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        attributes: attrs,
+      };
+      if (row.eval_id) {
+        asset.dnshEvaluation = {
+          assetId: row.id,
+          evaluationDate: row.evaluation_date,
+          evaluator: 'Analyst User',
+          mitigationStatus: row.mitigation_status,
+          adaptationStatus: row.adaptation_status,
+          adaptationStatusPreMeasures: row.adaptation_status_pre_measures,
+          adaptationStatusPostMeasures: row.adaptation_status_post_measures,
+          adaptationRiskBand: row.adaptation_risk_band,
+          waterStatus: row.water_status,
+          circularStatus: row.circular_status,
+          pollutionStatus: row.pollution_status,
+          biodiversityStatus: row.biodiversity_status,
+          overallStatus: row.overall_status,
+          overallNotes: row.overall_notes,
+          mitigationEvidence: row.mitigation_evidence || [],
+          adaptationMeasures: row.adaptation_measures || [],
+          waterEvidence: row.water_evidence || [],
+          circularEvidence: row.circular_evidence || [],
+          pollutionEvidence: row.pollution_evidence || [],
+          biodiversityEvidence: row.biodiversity_evidence || [],
+        };
+      }
+      return asset;
+    });
 
     // Get evidence documents
     const evidence = await query(

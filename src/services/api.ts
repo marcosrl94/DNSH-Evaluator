@@ -26,6 +26,12 @@ function getApiBaseUrl(): string {
   return base;
 }
 
+/** Obtiene la URL base del backend (sin /api/v1) para health checks */
+function getBackendBaseUrl(): string {
+  const apiBase = getApiBaseUrl();
+  return apiBase.replace(/\/api\/v1\/?$/, '') || apiBase;
+}
+
 // Debug: en desarrollo, saber a qué URL se conecta
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
   console.log('[API] Base URL:', getApiBaseUrl());
@@ -185,6 +191,16 @@ class ApiClient {
     );
     this.setToken(response.token);
     return response;
+  }
+
+  /** Pre-calienta la conexión al backend (evita cold start en primer intento de login) */
+  async warmUpConnection(): Promise<void> {
+    const healthUrl = getBackendBaseUrl() + '/health';
+    try {
+      await fetch(healthUrl, { method: 'GET', credentials: 'omit' });
+    } catch {
+      // Silenciar: el warm-up es best-effort
+    }
   }
 
   async refreshToken(refreshToken: string) {

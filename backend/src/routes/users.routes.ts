@@ -56,7 +56,16 @@ router.get('/:id', async (req: any, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    return res.json({ user: users[0] });
+    const u = users[0] as { id: string; email: string; name: string; role: string; avatar_url?: string | null };
+    return res.json({
+      user: {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        avatarUrl: u.avatar_url || null
+      }
+    });
   } catch (error: any) {
     logger.error('Get user error:', error);
     return res.status(500).json({ error: 'Failed to fetch user' });

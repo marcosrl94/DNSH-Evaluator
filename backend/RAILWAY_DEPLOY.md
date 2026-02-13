@@ -107,6 +107,22 @@ cd /app
 node dist/database/migrate.js
 ```
 
+### 5b. Cargar Operación Demo (para presentaciones)
+
+Para tener una operación de ejemplo pre-cargada en producción:
+
+```bash
+npm run db:seed
+```
+
+Esto crea:
+- Organización **EcoInvest Demo** (plan professional)
+- Usuario admin: `admin@ecoinvest.com` / `admin123` (si no existe)
+- Cliente **EcoEnergy Iberia**
+- Operación **Iberia Solar PV Portfolio** con 3 activos y evaluaciones DNSH (Compliant, Non-Compliant, Conditional)
+
+El seed es **idempotente**: si la operación demo ya existe, no duplica datos.
+
 ### 6. Verificar el Deploy
 
 1. Railway te dará una URL pública (algo como: `https://tu-servicio.up.railway.app`)

@@ -4,6 +4,7 @@ import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle, UserPlus, Eye, EyeOff
 import { UserRole } from '../types';
 import PalantirLoader from '../components/PalantirLoader';
 import { initGoogleAuth } from '../services/auth';
+import { apiClient } from '../src/services/api';
 
 // Global flag to prevent multiple Google initializations across all instances
 declare global {
@@ -80,6 +81,8 @@ const LoginPage: React.FC = () => {
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const googleInitializedRef = useRef(false);
   const initializationAttemptedRef = useRef(false);
+  const loginWithGoogleRef = useRef(loginWithGoogle);
+  loginWithGoogleRef.current = loginWithGoogle;
 
   // Load remembered email and preferences on mount
   useEffect(() => {
@@ -94,6 +97,13 @@ const LoginPage: React.FC = () => {
       setKeepSignedIn(true);
     }
   }, [isRegisterMode]);
+
+  // Pre-calentar conexión al backend (evita fallo en primer intento con Google)
+  useEffect(() => {
+    if (import.meta.env.VITE_USE_API === 'true' || import.meta.env.VITE_API_URL || window.location?.origin?.includes('vercel.app')) {
+      apiClient.warmUpConnection();
+    }
+  }, []);
 
   // Update remembered email when rememberMe changes
   useEffect(() => {
@@ -321,7 +331,8 @@ const LoginPage: React.FC = () => {
             try {
               clearError();
               setLocalError(null);
-              await loginWithGoogle(rememberMe, keepSignedIn, response.credential);
+              // Usar ref para tener siempre la versión más reciente (evita closure obsoleto)
+              await loginWithGoogleRef.current(rememberMe, keepSignedIn, response.credential);
               setLoginSuccess(true);
             } catch (err: any) {
               setLocalError(err.message || 'Error al iniciar sesión con Google');

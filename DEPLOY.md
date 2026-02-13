@@ -35,6 +35,8 @@ Esta aplicación puede desplegarse en varias plataformas. Aquí tienes las opcio
 
    **Backend en Railway:** En Railway → Variables pon `CORS_ORIGIN=https://dnsh-evaluator.vercel.app`. Ver [backend/RAILWAY_VARIABLES.md](backend/RAILWAY_VARIABLES.md).
 
+**Operación demo:** Tras el deploy, ejecuta en Railway `npm run db:seed` para cargar una operación de ejemplo (Iberia Solar PV Portfolio) con 3 activos y evaluaciones DNSH. Ver [backend/RAILWAY_DEPLOY.md](backend/RAILWAY_DEPLOY.md) § 5b.
+
 **Ventajas:**
 - ✅ Despliegue automático en cada push
 - ✅ HTTPS gratuito

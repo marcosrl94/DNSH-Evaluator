@@ -10,6 +10,7 @@ import { useOnlineUsers, OnlineUser } from '../context/OnlineUsersContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { socketService } from '../src/services/socketService';
+import { getStoredToken } from '../utils/sessionManager';
 
 interface FloatingOnlineUsersProps {
   operationId?: string;
@@ -25,27 +26,39 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // Check socket connection status
+  // Check socket connection status y escuchar connect/disconnect
   useEffect(() => {
-    const checkConnection = () => {
-      setIsConnected(socketService.isConnected());
-    };
-    
+    const checkConnection = () => setIsConnected(socketService.isConnected());
     checkConnection();
     const interval = setInterval(checkConnection, 2000);
-    return () => clearInterval(interval);
+    const socket = socketService.getSocket();
+    const onConnect = () => setIsConnected(true);
+    const onDisconnect = () => setIsConnected(false);
+    socket?.on('connect', onConnect);
+    socket?.on('disconnect', onDisconnect);
+    return () => {
+      clearInterval(interval);
+      socket?.off('connect', onConnect);
+      socket?.off('disconnect', onDisconnect);
+    };
   }, []);
 
   const handleReconnect = useCallback(async () => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
+    const token = getStoredToken();
+    if (!token) return;
+    setIsReconnecting(true);
+    try {
       await socketService.reconnect(token);
+      await new Promise(r => setTimeout(r, 800));
       setIsConnected(socketService.isConnected());
+    } finally {
+      setIsReconnecting(false);
     }
   }, []);
 
-  // Filter users based on context (excluding current user) - only real users from socket/API
+  // Incluir usuario actual + otros online (para que el usuario vea que está conectado)
   let relevantUsers = onlineUsers.filter(u => u.id !== user?.id);
   if (assetId) {
     relevantUsers = usersInAsset(String(assetId)).filter(u => u.id !== user?.id);
@@ -53,8 +66,18 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
     relevantUsers = usersInOperation(String(operationId)).filter(u => u.id !== user?.id);
   }
 
-  // Solo mostrar usuarios reales conectados (sin datos demo)
-  const displayUsers = relevantUsers;
+  // Añadir usuario actual al listado para que vea que está online
+  const currentUserAsOnline: OnlineUser | null = user ? {
+    id: user.id,
+    name: user.name || 'Usuario',
+    email: user.email || '',
+    avatarUrl: user.avatarUrl,
+    role: user.role || 'Analyst',
+    lastSeen: new Date()
+  } : null;
+  const displayUsers = currentUserAsOnline
+    ? [currentUserAsOnline, ...relevantUsers]
+    : relevantUsers;
 
   const maxVisible = 4;
   const visibleUsers = displayUsers.slice(0, maxVisible);
@@ -212,7 +235,7 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
                   </h3>
                 </div>
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${theme === 'dark' ? 'bg-[#00ff88]/20 text-[#00ff88]' : 'bg-emerald-100 text-emerald-700'}`}>
-                {displayUsers.length}
+                {displayUsers.length} online
               </span>
               </div>
               {(operationId || assetId) && (
@@ -227,10 +250,11 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
                   </p>
                   <button
                     onClick={handleReconnect}
-                    className={`text-xs px-2 py-1 rounded ${theme === 'dark' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}
+                    disabled={isReconnecting}
+                    className={`text-xs px-2 py-1 rounded ${theme === 'dark' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'} disabled:opacity-60`}
                     title="Reintentar conexión"
                   >
-                    <RefreshCw size={12} className="inline" /> Reconectar
+                    <RefreshCw size={12} className={`inline ${isReconnecting ? 'animate-spin' : ''}`} /> {isReconnecting ? 'Conectando…' : 'Reconectar'}
                   </button>
                 </div>
               )}
@@ -241,7 +265,7 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
                 <div className="text-center py-8">
                   <Users size={32} className={`mx-auto mb-2 ${themeClasses.text.tertiary}`} />
                   <p className={`text-sm ${themeClasses.text.secondary}`}>
-                    No hay otros usuarios online
+                    {user ? 'No hay usuarios online' : 'Inicia sesión para ver presencia'}
                   </p>
                   {!isConnected && (
                     <div className="mt-2 space-y-2">
@@ -250,35 +274,36 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
                       </p>
                       <button
                         onClick={handleReconnect}
-                        className={`text-xs px-3 py-1.5 rounded font-medium ${theme === 'dark' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}
+                        disabled={isReconnecting}
+                        className={`text-xs px-3 py-1.5 rounded font-medium ${theme === 'dark' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'} disabled:opacity-60`}
                       >
-                        <RefreshCw size={12} className="inline mr-1" /> Reconectar
+                        <RefreshCw size={12} className={`inline mr-1 ${isReconnecting ? 'animate-spin' : ''}`} /> {isReconnecting ? 'Conectando…' : 'Reconectar'}
                       </button>
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {displayUsers.map((user) => (
+                  {displayUsers.map((u) => (
                     <div
-                      key={user.id}
+                      key={u.id}
                       className={`flex items-center space-x-3 p-3 rounded-lg ${themeClasses.bg.hover} transition-colors`}
                     >
                       {/* Avatar */}
                       <div className="relative flex-shrink-0">
                         <div
-                          className={`w-10 h-10 rounded-full ${getAvatarColor(user.id)} flex items-center justify-center text-white text-sm font-bold border-2 ${
+                          className={`w-10 h-10 rounded-full ${getAvatarColor(u.id)} flex items-center justify-center text-white text-sm font-bold border-2 ${
                             theme === 'dark' ? 'border-[#1a1a1a]' : 'border-white'
                           } shadow-md`}
                         >
-                          {user.avatarUrl ? (
+                          {u.avatarUrl ? (
                             <img
-                              src={String(user.avatarUrl)}
-                              alt={String(user.name || 'User')}
+                              src={String(u.avatarUrl)}
+                              alt={String(u.name || 'User')}
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
-                            <span>{getInitials(user.name)}</span>
+                            <span>{getInitials(u.name)}</span>
                           )}
                         </div>
                         {/* Online Status Dot */}
@@ -288,18 +313,21 @@ export const FloatingOnlineUsers: React.FC<FloatingOnlineUsersProps> = ({
                       {/* User Info */}
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-semibold truncate ${themeClasses.text.primary}`}>
-                          {String(user.name || 'Usuario')}
+                          {String(u.name || 'Usuario')}
+                          {u.id === user?.id && (
+                            <span className={`ml-1.5 text-[10px] font-normal ${themeClasses.text.tertiary}`}>(tú)</span>
+                          )}
                         </p>
                         <div className="flex items-center space-x-2 mt-0.5">
                           <p className={`text-xs truncate ${themeClasses.text.secondary}`}>
-                            {String(user.role || 'Analyst')}
+                            {String(u.role || 'Analyst')}
                           </p>
-                          {user.currentOperationId && (
+                          {u.currentOperationId && (
                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${theme === 'dark' ? 'bg-[#1a1a1a] text-[#00ff88]' : 'bg-gray-100 text-emerald-600'}`}>
                               OP
                             </span>
                           )}
-                          {user.currentAssetId && (
+                          {u.currentAssetId && (
                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${theme === 'dark' ? 'bg-[#1a1a1a] text-blue-400' : 'bg-gray-100 text-blue-600'}`}>
                               ASSET
                             </span>

@@ -443,7 +443,16 @@ router.get('/me', authenticate as any, async (req: any, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user: users[0] });
+    const u = users[0];
+    res.json({
+      user: {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        avatarUrl: u.avatar_url || null
+      }
+    });
   } catch (error: any) {
     logger.error('Get user error:', error);
     res.status(500).json({ error: 'Failed to get user info' });
@@ -524,18 +533,20 @@ router.post(
         name: string;
         role: string;
         is_active: boolean;
+        avatar_url: string | null;
       }>(
-        'SELECT id, email, name, role, is_active FROM users WHERE email = $1',
+        'SELECT id, email, name, role, is_active, avatar_url FROM users WHERE email = $1',
         [decoded.email]
       );
 
-      let user;
+      type UserRow = { id: string; email: string; name: string; role: string; avatar_url?: string | null; is_active?: boolean };
+      let user: UserRow;
       if (existingUsers.length === 0) {
         // Create new user from Google
-        const newUsers = await query<{ id: string; email: string; name: string; role: string }>(
+        const newUsers = await query<{ id: string; email: string; name: string; role: string; avatar_url: string | null }>(
           `INSERT INTO users (email, name, auth_provider, provider_id, role, avatar_url)
            VALUES ($1, $2, 'google', $3, 'Evaluator', $4)
-           RETURNING id, email, name, role`,
+           RETURNING id, email, name, role, avatar_url`,
           [
             decoded.email,
             decoded.name || decoded.email.split('@')[0],
@@ -548,12 +559,12 @@ router.post(
           throw createError('Failed to create user', 500);
         }
 
-        user = newUsers[0] as { id: string; email: string; name: string; role: string; is_active?: boolean };
+        user = { ...newUsers[0], is_active: true };
         logger.info(`New Google user created: ${decoded.email}`);
       } else {
-        user = existingUsers[0] as { id: string; email: string; name: string; role: string; is_active?: boolean };
+        user = existingUsers[0];
 
-        if (!user.is_active) {
+        if (user.is_active === false) {
           return res.status(403).json({ error: 'Account is inactive' });
         }
 
@@ -566,6 +577,8 @@ router.post(
            WHERE id = $2`,
           [decoded.picture || null, user.id]
         );
+        // Refresh avatar_url after update (in case it was null before)
+        user.avatar_url = decoded.picture || user.avatar_url;
       }
 
       // Generate tokens (same as login)
@@ -596,7 +609,8 @@ router.post(
           id: user.id,
           email: user.email,
           name: user.name,
-          role: (user as any).role || 'User'
+          role: (user as any).role || 'User',
+          avatarUrl: user.avatar_url || (decoded as any).picture || null
         },
         token,
         refreshToken

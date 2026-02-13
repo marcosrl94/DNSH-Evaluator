@@ -18,7 +18,11 @@ let pool: Pool | null = null;
  * - Local: DATABASE_URL or DATABASE_HOST/PORT/etc
  */
 function buildPoolConfig(): PoolConfig {
-  const connectionString = process.env.DATABASE_URL;
+  let connectionString = process.env.DATABASE_URL;
+  // railway run desde local: postgres.railway.internal no resuelve; usar DATABASE_PUBLIC_URL si existe
+  if (connectionString?.includes('railway.internal') && process.env.DATABASE_PUBLIC_URL) {
+    connectionString = process.env.DATABASE_PUBLIC_URL;
+  }
   const isRailway = connectionString?.includes('railway.internal') || connectionString?.includes('.rlwy.net');
 
   const baseConfig: PoolConfig = {

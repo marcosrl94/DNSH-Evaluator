@@ -113,10 +113,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           try {
             const currentUser = await apiClient.getCurrentUser();
             
-            // Merge API user data with stored data
+            // Merge API user data with stored data (avatarUrl from API for Gmail photo)
+            const apiUser = currentUser.user as { id: string; email: string; name: string; role: string; avatarUrl?: string | null; avatar_url?: string | null };
             const mergedUser: User = {
               ...storedUser,
               ...currentUser.user,
+              avatarUrl: apiUser?.avatarUrl ?? apiUser?.avatar_url ?? storedUser.avatarUrl,
               permissions: storedUser.permissions || getPermissionsForRole(currentUser.user.role)
             };
             
@@ -255,8 +257,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (shouldUseAPI() && credential) {
         // Use backend API with provided credential
         try {
-          // Send credential to backend
-          const result = await apiClient.loginWithGoogle(credential);
+          // Retry una vez si falla por cold start / timeout (primer intento suele fallar)
+          const callWithRetry = async (attempt = 1): Promise<ReturnType<typeof apiClient.loginWithGoogle>> => {
+            try {
+              return await apiClient.loginWithGoogle(credential);
+            } catch (err: any) {
+              const isRetryable = attempt < 2 && (
+                err?.message?.includes('timeout') ||
+                err?.message?.includes('Failed to fetch') ||
+                err?.message?.includes('NetworkError') ||
+                err?.name === 'AbortError' ||
+                (err?.message && /50[23]|ECONNREFUSED|ETIMEDOUT/i.test(String(err.message)))
+              );
+              if (isRetryable) {
+                logger.warn('Google auth retry (intento ' + (attempt + 1) + ')...', err?.message);
+                await new Promise(r => setTimeout(r, 2000));
+                return callWithRetry(attempt + 1);
+              }
+              throw err;
+            }
+          };
+          const result = await callWithRetry();
           
           // Ensure token is stored
           if (result.token) {

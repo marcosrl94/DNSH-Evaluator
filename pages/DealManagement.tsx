@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { Upload, FileText, Plus, X, CheckCircle, AlertCircle, Building2, MapPin, Briefcase, Download, FileSpreadsheet, Trash2, Edit, List, Search, Filter, Archive, ArchiveRestore, CheckSquare, Square } from 'lucide-react';
+import { Upload, FileText, Plus, X, CheckCircle, AlertCircle, Building2, MapPin, Briefcase, Download, FileSpreadsheet, Trash2, Edit, List, Search, Filter, Archive, ArchiveRestore, CheckSquare, Square, ClipboardPaste } from 'lucide-react';
 import { Operation, Asset, EUAssetType, Client, DnshObjective, EvidenceType, EvidenceDocument } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { getThemeClasses } from '../utils/themeUtils';
@@ -7,6 +7,16 @@ import { getAllClients, createClient, createOperation, getAllOperations, getActi
 import { logger } from '../utils/logger';
 import { generateGeographicAttributes } from '../utils/geoCalculations';
 import { processDocument, createEvidenceFromProcessed, ProcessedDocumentData } from '../services/documentProcessor';
+import {
+  validateNACE,
+  validateRequiredString,
+  validateCoordinates,
+  validatePositiveNumber,
+  validateOptionalPositive,
+  parseBulkCsv,
+  parseAssetType,
+  type ValidationResult
+} from '../utils/dealValidation';
 
 interface DealFormData {
   // Cliente/Compañía
@@ -18,11 +28,10 @@ interface DealFormData {
   
   // Deal/Operación
   dealName: string;
+  dealDescription?: string;
   sectorNACE: string;
   country: string;
-  capex: number;
   dealPrice?: number;
-  expectedReturn?: number;
   substantialContributionId: DnshObjective | 'N/A';
   
   // Assets
@@ -38,10 +47,11 @@ interface AssetFormData {
   lat: number;
   lng: number;
   exposedValue: number;
+  siteType?: 'Brownfield' | 'Greenfield';
   yearBuilt?: number;
   capacity?: number;
   capacityUnit?: string;
-  // Estos campos se calculan automáticamente
+  // Calculados automáticamente
   elevationMeters?: number;
   distanceToCoastKm?: number;
 }
@@ -71,6 +81,9 @@ const DealManagement: React.FC = () => {
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [selectedDeals, setSelectedDeals] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<'archive' | 'delete' | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [bulkPasteText, setBulkPasteText] = useState('');
+  const [bulkPreview, setBulkPreview] = useState<{ deals: number; assets: number; errors: { row: number; message: string }[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const evidenceFileInputRef = useRef<HTMLInputElement>(null);
   const [processingDocuments, setProcessingDocuments] = useState<Set<number>>(new Set());
@@ -83,11 +96,10 @@ const DealManagement: React.FC = () => {
     clientSector: '',
     createNewClient: false,
     dealName: '',
+    dealDescription: '',
     sectorNACE: '',
     country: '',
-    capex: 0,
     dealPrice: undefined,
-    expectedReturn: undefined,
     substantialContributionId: DnshObjective.MITIGATION,
     assets: [{ name: '', assetType: EUAssetType.SOLAR_PV, lat: 0, lng: 0, exposedValue: 0 }],
     evidenceDocuments: []
@@ -142,7 +154,7 @@ const DealManagement: React.FC = () => {
   const handleAddAsset = () => {
     setFormData(prev => ({
       ...prev,
-      assets: [...prev.assets, { name: '', assetType: EUAssetType.SOLAR_PV, lat: 0, lng: 0, exposedValue: 0 }]
+      assets: [...prev.assets, { name: '', assetType: EUAssetType.SOLAR_PV, lat: 0, lng: 0, exposedValue: 0 } as AssetFormData]
     }));
   };
 
@@ -246,55 +258,49 @@ const DealManagement: React.FC = () => {
     }
   };
 
+  const validateField = (field: string, value: any, context?: { index?: number }) => {
+    let result: ValidationResult = { valid: true };
+    if (field === 'dealName') result = validateRequiredString(value, 'Nombre del deal');
+    else if (field === 'clientName') result = validateRequiredString(value, 'Nombre del cliente');
+    else if (field === 'sectorNACE') result = validateNACE(value);
+    else if (field === 'country') result = validateRequiredString(value, 'País');
+    else if (field === 'assetName' && context?.index !== undefined) result = validateRequiredString(value, `Nombre asset ${(context.index ?? 0) + 1}`);
+    else if (field === 'assetCoords' && context?.index !== undefined && value) result = validateCoordinates(value.lat, value.lng);
+    else if (field === 'exposedValue' && context?.index !== undefined) result = validatePositiveNumber(value, 'Valor expuesto');
+    setFieldErrors(prev => {
+      const next = { ...prev };
+      const key = context ? `${field}_${context.index}` : field;
+      if (result.valid) delete next[key];
+      else next[key] = result.error!;
+      return next;
+    });
+    return result.valid;
+  };
+
   const validateForm = (): string | null => {
-    if (!formData.dealName.trim()) {
-      return 'El nombre del deal es requerido';
-    }
-    
-    if (formData.createNewClient && !formData.clientName.trim()) {
-      return 'El nombre del cliente es requerido cuando se crea uno nuevo';
-    }
-    
-    if (!formData.createNewClient && !formData.clientId) {
-      return 'Debe seleccionar o crear un cliente';
-    }
-    
-    if (!formData.sectorNACE.trim()) {
-      return 'El sector NACE es requerido';
-    }
-    
-    if (!formData.country.trim()) {
-      return 'El país es requerido';
-    }
-    
-    if (formData.capex <= 0) {
-      return 'El CAPEX debe ser mayor a 0';
-    }
-    
-    if (formData.assets.length === 0) {
-      return 'Debe agregar al menos un asset';
-    }
-    
-    for (let i = 0; i < formData.assets.length; i++) {
-      const asset = formData.assets[i];
-      if (!asset.name.trim()) {
-        return `El nombre del asset ${i + 1} es requerido`;
-      }
-      if (asset.lat === 0 && asset.lng === 0) {
-        return `La localización del asset ${i + 1} es requerida`;
-      }
-      if (asset.exposedValue <= 0) {
-        return `El valor expuesto del asset ${i + 1} debe ser mayor a 0`;
-      }
-    }
-    
-    return null;
+    const errs: string[] = [];
+    if (!formData.dealName.trim()) errs.push('El nombre del deal es requerido');
+    if (formData.createNewClient && !formData.clientName.trim()) errs.push('El nombre del cliente es requerido');
+    if (!formData.createNewClient && !formData.clientId) errs.push('Debe seleccionar o crear un cliente');
+    const naceRes = validateNACE(formData.sectorNACE);
+    if (!naceRes.valid) errs.push(naceRes.error!);
+    if (!formData.country.trim()) errs.push('El país es requerido');
+    if (formData.assets.length === 0) errs.push('Debe agregar al menos un asset');
+    formData.assets.forEach((asset, i) => {
+      if (!asset.name.trim()) errs.push(`Asset ${i + 1}: nombre requerido`);
+      const coordsRes = validateCoordinates(asset.lat, asset.lng);
+      if (!coordsRes.valid) errs.push(`Asset ${i + 1}: ${coordsRes.error}`);
+      const expRes = validatePositiveNumber(asset.exposedValue, 'Valor expuesto');
+      if (!expRes.valid) errs.push(`Asset ${i + 1}: ${expRes.error}`);
+    });
+    return errs.length > 0 ? errs[0] : null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(null);
+    setFieldErrors({});
     
     const validationError = validateForm();
     if (validationError) {
@@ -347,6 +353,7 @@ const DealManagement: React.FC = () => {
             attributes: {
               elevationMeters,
               distanceToCoastKm,
+              siteType: assetData.siteType,
               yearBuilt: assetData.yearBuilt,
               capacity: assetData.capacity,
               capacityUnit: assetData.capacityUnit
@@ -394,15 +401,15 @@ const DealManagement: React.FC = () => {
         })
       );
 
-      // 4. Crear operación usando la función centralizada
+      // 4. Crear operación (capex = suma valor expuesto de assets)
+      const capex = createdAssets.reduce((sum, a) => sum + (a.exposedValue || 0), 0);
       const operationData: Partial<Operation> = {
         clientId,
         name: formData.dealName,
         sectorNACE: formData.sectorNACE,
         country: formData.country,
-        capex: formData.capex,
+        capex: capex || 0,
         dealPrice: formData.dealPrice,
-        expectedReturn: formData.expectedReturn,
         substantialContributionId: formData.substantialContributionId === 'N/A' ? DnshObjective.MITIGATION : formData.substantialContributionId,
         status: 'Draft',
         assets: createdAssets,
@@ -425,11 +432,10 @@ const DealManagement: React.FC = () => {
         clientSector: '',
         createNewClient: false,
         dealName: '',
+        dealDescription: '',
         sectorNACE: '',
         country: '',
-        capex: 0,
         dealPrice: undefined,
-        expectedReturn: undefined,
         substantialContributionId: 'N/A' as DnshObjective | 'N/A',
         assets: [{ name: '', assetType: EUAssetType.SOLAR_PV, lat: 0, lng: 0, exposedValue: 0 }],
         evidenceDocuments: []
@@ -448,52 +454,173 @@ const DealManagement: React.FC = () => {
     }
   };
 
+  const requiredBulkHeaders = ['deal_name', 'client_name', 'asset_name', 'asset_type', 'lat', 'lng', 'exposed_value'];
+
+  const processBulkDeals = async (deals: Map<string, { deal: Partial<DealFormData>; assets: AssetFormData[] }>) => {
+    let successCount = 0;
+    let errorCount = 0;
+    for (const [dealName, dealData] of deals) {
+      try {
+        const client = await createClient({
+          name: dealData.deal.clientName!,
+          country: dealData.deal.clientCountry || undefined,
+          sector: dealData.deal.clientSector || undefined
+        });
+        const createdAssets: Asset[] = await Promise.all(
+          dealData.assets.map(async (assetData, index) => {
+            let elevationMeters = assetData.elevationMeters;
+            let distanceToCoastKm = assetData.distanceToCoastKm;
+            if (!elevationMeters || !distanceToCoastKm) {
+              try {
+                const geoAttrs = await generateGeographicAttributes(assetData.lat, assetData.lng);
+                elevationMeters = geoAttrs.elevationMeters;
+                distanceToCoastKm = geoAttrs.distanceToCoastKm;
+              } catch { /* ignore */ }
+            }
+            return {
+              id: `asset-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 11)}`,
+              operationId: '',
+              name: assetData.name,
+              assetType: assetData.assetType,
+              lat: assetData.lat,
+              lng: assetData.lng,
+              exposedValue: assetData.exposedValue,
+              attributes: { elevationMeters, distanceToCoastKm, yearBuilt: assetData.yearBuilt, capacity: assetData.capacity, capacityUnit: assetData.capacityUnit, siteType: assetData.siteType }
+            };
+          })
+        );
+        const capex = createdAssets.reduce((sum, a) => sum + (a.exposedValue || 0), 0);
+        await createOperation({
+          clientId: client.id,
+          name: dealName,
+          sectorNACE: dealData.deal.sectorNACE || '',
+          country: dealData.deal.country || '',
+          capex: capex || 0,
+          dealPrice: dealData.deal.dealPrice,
+          substantialContributionId: dealData.deal.substantialContributionId || ('N/A' as DnshObjective | 'N/A'),
+          status: 'Draft',
+          assets: createdAssets,
+          evidenceDocuments: []
+        });
+        successCount++;
+      } catch (err: any) {
+        logger.error(`Error creating deal ${dealName}:`, err);
+        errorCount++;
+      }
+    }
+    setSubmitSuccess(`${successCount} deal(s) creado(s)${errorCount > 0 ? `. ${errorCount} error(es)` : ''}`);
+    setTimeout(() => window.location.reload(), 2000);
+  };
+
+  const handleBulkFromPaste = async () => {
+    if (!bulkPasteText.trim()) return;
+    const cleanText = bulkPasteText.split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).join('\n');
+    const { rows, errors } = parseBulkCsv(cleanText, requiredBulkHeaders);
+    if (errors.length > 0 && rows.length === 0) {
+      setSubmitError(`Errores en los datos:\n${errors.map(e => `Fila ${e.row}: ${e.message}`).join('\n')}`);
+      return;
+    }
+    const deals: Map<string, { deal: Partial<DealFormData>; assets: AssetFormData[] }> = new Map();
+    for (const row of rows) {
+      const dealName = row['deal_name']?.trim() || '';
+      if (!dealName) continue;
+      if (!deals.has(dealName)) {
+        deals.set(dealName, {
+          deal: {
+            dealName,
+            dealDescription: row['deal_description']?.trim() || undefined,
+            clientName: row['client_name'] || '',
+            clientCountry: row['client_country'] || '',
+            clientSector: row['client_sector'] || '',
+            createNewClient: true,
+            sectorNACE: row['sector_nace'] || '',
+            country: row['country'] || '',
+            dealPrice: row['deal_price'] ? parseFloat(row['deal_price']) : undefined,
+            substantialContributionId: (row['substantial_contribution'] === 'N/A' || !row['substantial_contribution']) ? ('N/A' as DnshObjective | 'N/A') : (row['substantial_contribution'] as DnshObjective),
+            assets: [],
+            evidenceDocuments: []
+          },
+          assets: []
+        });
+      }
+      const siteTypeRaw = (row['site_type'] || '').trim().toLowerCase();
+      const siteType = siteTypeRaw === 'brownfield' ? 'Brownfield' : siteTypeRaw === 'greenfield' ? 'Greenfield' : undefined;
+      deals.get(dealName)!.assets.push({
+        name: row['asset_name'],
+        assetType: parseAssetType(row['asset_type'] || ''),
+        lat: parseFloat(row['lat']) || 0,
+        lng: parseFloat(row['lng']) || 0,
+        exposedValue: parseFloat(row['exposed_value']) || 0,
+        siteType,
+        yearBuilt: row['year_built'] ? parseInt(row['year_built']) : undefined,
+        capacity: row['capacity'] ? parseFloat(row['capacity']) : undefined,
+        capacityUnit: row['capacity_unit'] || undefined
+      });
+    }
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    setIsSubmitting(true);
+    try {
+      await processBulkDeals(deals);
+      setBulkPasteText('');
+      setBulkPreview(null);
+    } catch (err: any) {
+      setSubmitError(err.message || 'Error al importar');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBulkPasteChange = (text: string) => {
+    setBulkPasteText(text);
+    setBulkPreview(null);
+    if (!text.trim()) return;
+    const { rows, errors } = parseBulkCsv(text, requiredBulkHeaders);
+    const byDeal = new Map<string, Record<string, string>[]>();
+    rows.forEach(r => {
+      const name = r.deal_name?.trim() || '';
+      if (!byDeal.has(name)) byDeal.set(name, []);
+      byDeal.get(name)!.push(r);
+    });
+    const totalAssets = rows.length;
+    setBulkPreview({
+      deals: byDeal.size,
+      assets: totalAssets,
+      errors
+    });
+  };
+
   const handleBulkUpload = async (file: File) => {
     setSubmitError(null);
     setSubmitSuccess(null);
     setIsSubmitting(true);
+    setBulkPasteText('');
+    setBulkPreview(null);
     
     try {
       const text = await file.text();
-      // Filtrar líneas de comentarios (empiezan con #)
-      const lines = text.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      
-      // Validar headers mínimos requeridos
-      // Nota: elevation_meters y distance_to_coast_km son opcionales (se calculan automáticamente)
-      const requiredHeaders = ['deal_name', 'client_name', 'asset_name', 'asset_type', 'lat', 'lng', 'exposed_value'];
-      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-      
-      if (missingHeaders.length > 0) {
-        throw new Error(`Faltan columnas requeridas: ${missingHeaders.join(', ')}`);
+      const cleanText = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).join('\n');
+      const { headers, rows, errors } = parseBulkCsv(cleanText, requiredBulkHeaders);
+      if (errors.length > 0 && rows.length === 0) {
+        throw new Error(`Errores en el archivo:\n${errors.map(e => `Fila ${e.row}: ${e.message}`).join('\n')}`);
       }
       
-      // Parsear CSV
       const deals: Map<string, { deal: Partial<DealFormData>; assets: AssetFormData[] }> = new Map();
-      
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        const row: Record<string, string> = {};
-        headers.forEach((header, index) => {
-          row[header] = values[index] || '';
-        });
-        
-        const dealName = row['deal_name'];
+      for (const row of rows) {
+        const dealName = row['deal_name']?.trim() || '';
         if (!dealName) continue;
-        
         if (!deals.has(dealName)) {
           deals.set(dealName, {
             deal: {
               dealName,
+              dealDescription: row['deal_description']?.trim() || undefined,
               clientName: row['client_name'] || '',
               clientCountry: row['client_country'] || '',
               clientSector: row['client_sector'] || '',
               createNewClient: true,
               sectorNACE: row['sector_nace'] || '',
               country: row['country'] || '',
-              capex: parseFloat(row['capex']) || 0,
               dealPrice: row['deal_price'] ? parseFloat(row['deal_price']) : undefined,
-              expectedReturn: row['expected_return'] ? parseFloat(row['expected_return']) : undefined,
               substantialContributionId: (row['substantial_contribution'] === 'N/A' || !row['substantial_contribution']) 
                 ? ('N/A' as DnshObjective | 'N/A')
                 : ((row['substantial_contribution'] as DnshObjective) || ('N/A' as DnshObjective | 'N/A')),
@@ -503,15 +630,16 @@ const DealManagement: React.FC = () => {
             assets: []
           });
         }
-        
         const deal = deals.get(dealName)!;
+        const siteTypeRaw = (row['site_type'] || '').trim().toLowerCase();
+        const siteType = siteTypeRaw === 'brownfield' ? 'Brownfield' : siteTypeRaw === 'greenfield' ? 'Greenfield' : undefined;
         deal.assets.push({
           name: row['asset_name'],
-          assetType: (row['asset_type'] as EUAssetType) || EUAssetType.SOLAR_PV,
+          assetType: parseAssetType(row['asset_type'] || ''),
           lat: parseFloat(row['lat']) || 0,
           lng: parseFloat(row['lng']) || 0,
           exposedValue: parseFloat(row['exposed_value']) || 0,
-          // elevationMeters y distanceToCoastKm se calcularán automáticamente si no están en el CSV
+          siteType,
           elevationMeters: row['elevation_meters'] ? parseFloat(row['elevation_meters']) : undefined,
           distanceToCoastKm: row['distance_to_coast_km'] ? parseFloat(row['distance_to_coast_km']) : undefined,
           yearBuilt: row['year_built'] ? parseInt(row['year_built']) : undefined,
@@ -520,80 +648,7 @@ const DealManagement: React.FC = () => {
         });
       }
       
-      // Crear deals
-      let successCount = 0;
-      let errorCount = 0;
-      
-      for (const [dealName, dealData] of deals) {
-        try {
-          // Crear cliente
-          const client = await createClient({
-            name: dealData.deal.clientName!,
-            country: dealData.deal.clientCountry || undefined,
-            sector: dealData.deal.clientSector || undefined
-          });
-          
-          // Crear assets con cálculo automático de atributos geográficos
-          const createdAssets: Asset[] = await Promise.all(
-            dealData.assets.map(async (assetData, index) => {
-              // Calcular atributos geográficos si no están presentes
-              let elevationMeters = assetData.elevationMeters;
-              let distanceToCoastKm = assetData.distanceToCoastKm;
-              
-              if (!elevationMeters || !distanceToCoastKm) {
-                try {
-                  const geoAttrs = await generateGeographicAttributes(assetData.lat, assetData.lng);
-                  elevationMeters = geoAttrs.elevationMeters;
-                  distanceToCoastKm = geoAttrs.distanceToCoastKm;
-                } catch (error) {
-                  logger.warn(`Error calculating geo attributes for asset ${index}:`, error);
-                }
-              }
-              
-              return {
-                id: `asset-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 11)}`,
-                operationId: '',
-                name: assetData.name,
-                assetType: assetData.assetType,
-                lat: assetData.lat,
-                lng: assetData.lng,
-                exposedValue: assetData.exposedValue,
-                attributes: {
-                  elevationMeters,
-                  distanceToCoastKm,
-                  yearBuilt: assetData.yearBuilt,
-                  capacity: assetData.capacity,
-                  capacityUnit: assetData.capacityUnit
-                }
-              };
-            })
-          );
-          
-          // Crear operación usando la función centralizada
-          const operationData: Partial<Operation> = {
-            clientId: client.id,
-            name: dealName,
-            sectorNACE: dealData.deal.sectorNACE || '',
-            country: dealData.deal.country || '',
-            capex: dealData.deal.capex || 0,
-            dealPrice: dealData.deal.dealPrice,
-            expectedReturn: dealData.deal.expectedReturn,
-            substantialContributionId: dealData.deal.substantialContributionId || ('N/A' as DnshObjective | 'N/A'),
-            status: 'Draft',
-            assets: createdAssets,
-            evidenceDocuments: []
-          };
-          
-          await createOperation(operationData);
-          
-          successCount++;
-        } catch (error: any) {
-          logger.error(`Error creating deal ${dealName}:`, error);
-          errorCount++;
-        }
-      }
-      
-      setSubmitSuccess(`${successCount} deal(s) creado(s) exitosamente${errorCount > 0 ? `. ${errorCount} error(es)` : ''}`);
+      await processBulkDeals(deals);
       
       // Recargar operaciones
       setTimeout(() => {
@@ -611,17 +666,17 @@ const DealManagement: React.FC = () => {
   const downloadTemplate = () => {
     const headers = [
       'deal_name',
+      'deal_description',
       'client_name',
       'client_country',
       'client_sector',
       'sector_nace',
       'country',
-      'capex',
       'deal_price',
-      'expected_return',
       'substantial_contribution',
       'asset_name',
       'asset_type',
+      'site_type',
       'lat',
       'lng',
       'exposed_value',
@@ -632,17 +687,17 @@ const DealManagement: React.FC = () => {
     
     const exampleRow = [
       'Solar Portfolio Spain',
+      'Solar portfolio en España',
       'Iberia Energy',
       'Spain',
       'Energy',
       'D.35.11',
       'Spain',
       '45000000',
-      '42000000',
-      '8.5',
       'Climate Change Mitigation',
       'Seville PV Plant A',
       'Solar PV',
+      'Greenfield',
       '37.3891',
       '-5.9845',
       '15000000',
@@ -651,11 +706,11 @@ const DealManagement: React.FC = () => {
       'MW'
     ];
     
-    // Nota: elevation_meters y distance_to_coast_km se calculan automáticamente desde lat/lng
+    // Nota: elevation_meters y distance_to_coast_km se calculan automáticamente desde lat/lng; capex se calcula desde exposed_value de los assets
     const csv = [
       '# Plantilla CSV para carga masiva de deals',
-      '# NOTA: elevation_meters y distance_to_coast_km se calculan automáticamente desde lat/lng',
-      '# No es necesario incluirlos en el CSV',
+      '# site_type: Brownfield | Greenfield (opcional)',
+      '# elevation_meters y distance_to_coast_km se calculan automáticamente desde lat/lng',
       headers.join(','),
       exampleRow.join(',')
     ].join('\n');
@@ -1012,10 +1067,13 @@ const DealManagement: React.FC = () => {
                 <input
                   type="text"
                   value={formData.dealName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, dealName: e.target.value }))}
-                  className={`w-full px-4 py-2 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                  onChange={(e) => { setFormData(prev => ({ ...prev, dealName: e.target.value })); setFieldErrors(prev => ({ ...prev, dealName: '' })); }}
+                  onBlur={() => validateField('dealName', formData.dealName)}
+                  className={`w-full px-4 py-2 ${themeClasses.input.bg} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] font-mono border ${fieldErrors.dealName ? 'border-red-500' : themeClasses.input.border}`}
+                  placeholder="Ej: Solar Portfolio Spain"
                   required
                 />
+                {fieldErrors.dealName && <p className="text-xs text-red-500 mt-1">{fieldErrors.dealName}</p>}
               </div>
               <div>
                 <label className={`block text-sm font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
@@ -1024,11 +1082,13 @@ const DealManagement: React.FC = () => {
                 <input
                   type="text"
                   value={formData.sectorNACE}
-                  onChange={(e) => setFormData(prev => ({ ...prev, sectorNACE: e.target.value }))}
+                  onChange={(e) => { setFormData(prev => ({ ...prev, sectorNACE: e.target.value })); setFieldErrors(prev => ({ ...prev, sectorNACE: '' })); }}
+                  onBlur={() => validateField('sectorNACE', formData.sectorNACE)}
                   placeholder="Ej: D.35.11"
-                  className={`w-full px-4 py-2 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                  className={`w-full px-4 py-2 ${themeClasses.input.bg} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] font-mono border ${fieldErrors.sectorNACE ? 'border-red-500' : themeClasses.input.border}`}
                   required
                 />
+                {fieldErrors.sectorNACE && <p className="text-xs text-red-500 mt-1">{fieldErrors.sectorNACE}</p>}
               </div>
               <div>
                 <label className={`block text-sm font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
@@ -1044,19 +1104,6 @@ const DealManagement: React.FC = () => {
               </div>
               <div>
                 <label className={`block text-sm font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
-                  CAPEX (€) *
-                </label>
-                <input
-                  type="number"
-                  value={formData.capex || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, capex: parseFloat(e.target.value) || 0 }))}
-                  className={`w-full px-4 py-2 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
-                  required
-                  min="0"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
                   PRECIO_DEAL (€)
                 </label>
                 <input
@@ -1064,19 +1111,8 @@ const DealManagement: React.FC = () => {
                   value={formData.dealPrice || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, dealPrice: e.target.value ? parseFloat(e.target.value) : undefined }))}
                   className={`w-full px-4 py-2 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                  placeholder="Opcional"
                   min="0"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
-                  RETORNO_ESPERADO (%)
-                </label>
-                <input
-                  type="number"
-                  value={formData.expectedReturn || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expectedReturn: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                  className={`w-full px-4 py-2 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
-                  step="0.1"
                 />
               </div>
               <div>
@@ -1094,6 +1130,18 @@ const DealManagement: React.FC = () => {
                   ))}
                 </select>
               </div>
+            </div>
+            <div>
+              <label className={`block text-sm font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
+                DESCRIPCIÓN_DEL_DEAL
+              </label>
+              <textarea
+                value={formData.dealDescription || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, dealDescription: e.target.value }))}
+                className={`w-full px-4 py-2 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono resize-y min-h-[80px]`}
+                placeholder="Descripción del deal, objetivos, contexto..."
+                rows={3}
+              />
             </div>
           </div>
 
@@ -1140,10 +1188,13 @@ const DealManagement: React.FC = () => {
                       <input
                         type="text"
                         value={asset.name}
-                        onChange={(e) => handleAssetChange(index, 'name', e.target.value)}
-                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                        onChange={(e) => { handleAssetChange(index, 'name', e.target.value); setFieldErrors(prev => ({ ...prev, [`assetName_${index}`]: '' })); }}
+                        onBlur={() => validateField('assetName', asset.name, { index })}
+                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] font-mono border ${fieldErrors[`assetName_${index}`] ? 'border-red-500' : themeClasses.input.border}`}
+                        placeholder="Ej: Seville PV Plant A"
                         required
                       />
+                      {fieldErrors[`assetName_${index}`] && <p className="text-[10px] text-red-500 mt-0.5">{fieldErrors[`assetName_${index}`]}</p>}
                     </div>
                     <div>
                       <label className={`block text-xs font-medium mb-1 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
@@ -1168,8 +1219,10 @@ const DealManagement: React.FC = () => {
                         type="number"
                         step="any"
                         value={asset.lat || ''}
-                        onChange={(e) => handleAssetChange(index, 'lat', parseFloat(e.target.value) || 0)}
-                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                        onChange={(e) => { handleAssetChange(index, 'lat', parseFloat(e.target.value) || 0); setFieldErrors(prev => ({ ...prev, [`assetCoords_${index}`]: '' })); }}
+                        onBlur={() => validateField('assetCoords', { lat: asset.lat, lng: asset.lng }, { index })}
+                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] font-mono border ${fieldErrors[`assetCoords_${index}`] ? 'border-red-500' : themeClasses.input.border}`}
+                        placeholder="37.3891"
                         required
                       />
                     </div>
@@ -1181,10 +1234,13 @@ const DealManagement: React.FC = () => {
                         type="number"
                         step="any"
                         value={asset.lng || ''}
-                        onChange={(e) => handleAssetChange(index, 'lng', parseFloat(e.target.value) || 0)}
-                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                        onChange={(e) => { handleAssetChange(index, 'lng', parseFloat(e.target.value) || 0); setFieldErrors(prev => ({ ...prev, [`assetCoords_${index}`]: '' })); }}
+                        onBlur={() => validateField('assetCoords', { lat: asset.lat, lng: asset.lng }, { index })}
+                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] font-mono border ${fieldErrors[`assetCoords_${index}`] ? 'border-red-500' : themeClasses.input.border}`}
+                        placeholder="-5.9845"
                         required
                       />
+                      {fieldErrors[`assetCoords_${index}`] && <p className="text-[10px] text-red-500 mt-0.5">{fieldErrors[`assetCoords_${index}`]}</p>}
                     </div>
                     <div>
                       <label className={`block text-xs font-medium mb-1 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
@@ -1193,11 +1249,14 @@ const DealManagement: React.FC = () => {
                       <input
                         type="number"
                         value={asset.exposedValue || ''}
-                        onChange={(e) => handleAssetChange(index, 'exposedValue', parseFloat(e.target.value) || 0)}
-                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                        onChange={(e) => { handleAssetChange(index, 'exposedValue', parseFloat(e.target.value) || 0); setFieldErrors(prev => ({ ...prev, [`exposedValue_${index}`]: '' })); }}
+                        onBlur={() => validateField('exposedValue', asset.exposedValue, { index })}
+                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] font-mono border ${fieldErrors[`exposedValue_${index}`] ? 'border-red-500' : themeClasses.input.border}`}
+                        placeholder="15000000"
                         required
                         min="0"
                       />
+                      {fieldErrors[`exposedValue_${index}`] && <p className="text-[10px] text-red-500 mt-0.5">{fieldErrors[`exposedValue_${index}`]}</p>}
                     </div>
                     {(asset.elevationMeters !== undefined || asset.distanceToCoastKm !== undefined) && (
                       <div className="col-span-full">
@@ -1225,6 +1284,20 @@ const DealManagement: React.FC = () => {
                     )}
                     <div>
                       <label className={`block text-xs font-medium mb-1 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
+                        TIPO_SUELO (Brownfield/Greenfield)
+                      </label>
+                      <select
+                        value={asset.siteType || ''}
+                        onChange={(e) => handleAssetChange(index, 'siteType', e.target.value ? (e.target.value as 'Brownfield' | 'Greenfield') : undefined)}
+                        className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                      >
+                        <option value="">-- No especificado --</option>
+                        <option value="Brownfield">Brownfield (suelo industrial previo)</option>
+                        <option value="Greenfield">Greenfield (terreno sin uso previo)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 font-mono uppercase tracking-wider ${themeClasses.text.secondary}`}>
                         AÑO_CONSTRUCCIÓN
                       </label>
                       <input
@@ -1232,6 +1305,9 @@ const DealManagement: React.FC = () => {
                         value={asset.yearBuilt || ''}
                         onChange={(e) => handleAssetChange(index, 'yearBuilt', e.target.value ? parseInt(e.target.value) : undefined)}
                         className={`w-full px-3 py-1.5 text-sm ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} focus:ring-[#00ff88] focus:border-[#00ff88] font-mono`}
+                        placeholder="Ej: 2020"
+                        min="1900"
+                        max={new Date().getFullYear() + 5}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1504,10 +1580,10 @@ const DealManagement: React.FC = () => {
               CARGA_MASIVA_CSV
             </h2>
             <p className={`text-sm font-mono ${themeClasses.text.tertiary} mb-4`}>
-              Sube un archivo CSV con la información de los deals. Descarga la plantilla para ver el formato requerido.
+              Sube un CSV o pega datos desde Excel (Ctrl+V). Se aceptan comas o tabuladores como separadores.
             </p>
             
-            <div className="flex items-center space-x-4 mb-6">
+            <div className="flex items-center space-x-4 mb-4">
               <button
                 type="button"
                 onClick={downloadTemplate}
@@ -1517,48 +1593,84 @@ const DealManagement: React.FC = () => {
                 DESCARGAR_PLANTILLA
               </button>
             </div>
+
+            {/* Pegar datos - Ágil para Excel */}
+            <div className={`mb-6 p-4 rounded-xl border ${themeClasses.border.default}`}>
+              <label className={`block text-sm font-medium mb-2 font-mono uppercase tracking-wider ${themeClasses.text.secondary} flex items-center`}>
+                <ClipboardPaste size={16} className="mr-2 text-[#00ff88]" />
+                PEGAR_DESDE_EXCEL
+              </label>
+              <textarea
+                value={bulkPasteText}
+                onChange={(e) => handleBulkPasteChange(e.target.value)}
+                placeholder={`Pega aquí los datos (cabecera + filas). Ejemplo:\ndeal_name,client_name,asset_name,asset_type,lat,lng,exposed_value\nSolar Spain,Iberia Energy,Plant A,Solar PV,37.39,-5.98,15000000`}
+                className={`w-full h-32 px-4 py-3 ${themeClasses.input.bg} ${themeClasses.input.border} rounded-lg ${themeClasses.input.text} font-mono text-xs resize-y focus:ring-[#00ff88] focus:border-[#00ff88]`}
+              />
+              {bulkPreview && (
+                <div className={`mt-3 p-3 rounded-lg flex items-center justify-between ${theme === 'dark' ? 'bg-[#0a0a0a]' : 'bg-gray-50'}`}>
+                  <div className="flex items-center gap-4">
+                    <span className={`text-sm font-mono ${themeClasses.text.primary}`}>{bulkPreview.deals} deals</span>
+                    <span className={`text-sm font-mono ${themeClasses.text.secondary}`}>{bulkPreview.assets} assets</span>
+                    {bulkPreview.errors.length > 0 && (
+                      <span className="text-sm font-mono text-amber-500">{bulkPreview.errors.length} advertencias</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleBulkFromPaste}
+                    disabled={isSubmitting || bulkPreview.deals === 0}
+                    className={`px-4 py-2 bg-[#00ff88] text-[#0a0a0a] rounded-lg font-medium hover:bg-[#00ff88]/80 font-mono uppercase tracking-wider text-xs disabled:opacity-50`}
+                  >
+                    {isSubmitting ? 'Importando…' : 'Importar'}
+                  </button>
+                </div>
+              )}
+              {bulkPreview?.errors && bulkPreview.errors.length > 0 && (
+                <div className="mt-2 max-h-24 overflow-y-auto">
+                  {bulkPreview.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-amber-500 font-mono">Fila {e.row}: {e.message}</p>
+                  ))}
+                </div>
+              )}
+            </div>
             
+            {/* Drag & drop archivo */}
             <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 const file = e.dataTransfer.files[0];
-                if (file && file.type === 'text/csv') {
+                if (file && (file.name.endsWith('.csv') || file.type === 'text/csv' || file.type === 'application/vnd.ms-excel')) {
                   handleBulkUpload(file);
+                } else {
+                  setSubmitError('Solo se aceptan archivos CSV');
                 }
               }}
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                theme === 'dark' 
-                  ? 'border-[#1a1a1a] hover:border-[#00ff88]/30' 
-                  : 'border-gray-300 hover:border-[#0066cc]/30'
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                theme === 'dark' ? 'border-[#1a1a1a] hover:border-[#00ff88]/30' : 'border-gray-300 hover:border-[#0066cc]/30'
               }`}
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv"
+                accept=".csv,text/csv"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) {
-                    handleBulkUpload(file);
-                  }
+                  if (file) handleBulkUpload(file);
                 }}
                 className="hidden"
               />
-              <Upload size={48} className={`mx-auto mb-4 ${themeClasses.text.tertiary}`} />
-              <p className={`font-mono uppercase tracking-wider mb-2 ${themeClasses.text.primary}`}>
-                ARRASTRA_ARCHIVO_CSV_O_CLIC_PARA_SELECCIONAR
+              <Upload size={36} className={`mx-auto mb-2 ${themeClasses.text.tertiary}`} />
+              <p className={`font-mono text-xs tracking-wider ${themeClasses.text.tertiary}`}>
+                O arrastra un archivo CSV aquí
               </p>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className={`px-4 py-2 bg-[#00ff88] text-[#0a0a0a] rounded-lg font-medium hover:bg-[#00ff88]/80 transition-colors font-mono uppercase tracking-wider text-xs`}
+                className={`mt-2 px-3 py-1.5 text-xs font-mono border rounded ${themeClasses.border.default} hover:${themeClasses.bg.hover}`}
               >
-                SELECCIONAR_ARCHIVO
+                Seleccionar archivo
               </button>
             </div>
           </div>
