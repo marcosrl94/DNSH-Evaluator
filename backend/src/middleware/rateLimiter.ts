@@ -6,7 +6,7 @@
 import rateLimit from 'express-rate-limit';
 
 const windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'); // 15 minutes
-const maxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100');
+const maxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '500'); // 500 req/15min para uso normal (crear deals, cargar datos)
 
 // General API rate limiter
 export const rateLimiter = rateLimit({

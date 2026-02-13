@@ -80,10 +80,15 @@ export async function migrateDemoData(): Promise<void> {
 
     // 4. Get or create demo client
     let clientId: string;
-    const existingClient = await client.query(
+    let existingClient = await client.query(
       `SELECT id FROM clients WHERE name = 'EcoEnergy Iberia' AND organization_id = $1 LIMIT 1`,
       [orgId]
     );
+    if (existingClient.rows.length === 0) {
+      existingClient = await client.query(
+        `SELECT id FROM clients WHERE name = 'EcoEnergy Iberia' LIMIT 1`
+      );
+    }
     if (existingClient.rows.length > 0) {
       clientId = existingClient.rows[0].id;
       logger.info('Using existing demo client: EcoEnergy Iberia');
@@ -100,16 +105,20 @@ export async function migrateDemoData(): Promise<void> {
       logger.info('Created demo client: EcoEnergy Iberia');
     }
 
-    // 5. Get or create demo operation (Iberia Solar PV Portfolio)
+    // 5. Get or create demo operation (Iberia Solar PV / Iberia Solar PV Portfolio)
     let operationId: string;
     const existingOp = await client.query(
       `SELECT o.id, (SELECT COUNT(*)::int FROM assets WHERE operation_id = o.id) as asset_count
        FROM operations o
        JOIN clients c ON o.client_id = c.id
-       WHERE c.name = 'EcoEnergy Iberia' AND o.name = 'Iberia Solar PV Portfolio'
+       WHERE c.name = 'EcoEnergy Iberia'
+         AND (o.name = 'Iberia Solar PV Portfolio' OR o.name = 'Iberia Solar PV')
+       ORDER BY o.name
        LIMIT 1`
     );
-    if (existingOp.rows.length > 0 && existingOp.rows[0].asset_count >= 3) {
+    // Siempre asegurar 3 assets: si la operación demo existe, recrear assets para demo completa
+    const skipIfComplete = process.env.SKIP_SEED_IF_ASSETS_EXIST === '1';
+    if (existingOp.rows.length > 0 && existingOp.rows[0].asset_count >= 3 && skipIfComplete) {
       logger.info('Demo operation already exists with assets, skipping');
       await client.query('COMMIT');
       return;
@@ -146,20 +155,20 @@ export async function migrateDemoData(): Promise<void> {
       );
     }
 
-    // 6. Create assets (skip if operation already has 3, else remove any partial and create 3)
+    // 6. Create assets (skip if operation already has 3 and not force, else remove any partial and create 3)
     const assetCount = await client.query(
       'SELECT COUNT(*)::int as cnt FROM assets WHERE operation_id = $1',
       [operationId]
     );
-    if (assetCount.rows[0].cnt >= 3) {
+    if (assetCount.rows[0].cnt >= 3 && skipIfComplete) {
       logger.info('Assets already exist, skipping');
       await client.query('COMMIT');
       return;
     }
-    // Si hay activos parciales (0, 1 o 2), borrarlos para crear 3 completos (CASCADE borra attributes y evaluations)
+    // Borrar activos existentes para recrear 3 completos (asegurar demo funcional)
     if (assetCount.rows[0].cnt > 0) {
       await client.query('DELETE FROM assets WHERE operation_id = $1', [operationId]);
-      logger.info('Removed partial assets, recreating...');
+      logger.info(`Removed ${assetCount.rows[0].cnt} existing asset(s), recreating 3 for demo...`);
     }
 
     // 7. Create assets with attributes and evaluations
